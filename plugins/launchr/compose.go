@@ -37,30 +37,31 @@ func (p *Plugin) InitApp(app *core.App) error {
 	return nil
 }
 
-// CobraPlugin implements plasmactl.CobraPlugin interface to provide discovered actions.
-func (p Plugin) CobraPlugin(rootCmd *cobra.Command) error {
+// CobraAddCommands implements core.CobraPlugin interface to provide discovered actions.
+func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
+	// CLI command to discover actions in file structure and provide
+	var composeCmd = &cobra.Command{
+		Use:   "compose",
+		Short: "Composes platform",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dp, _ := GetDiscoveryPath()
+
+			action, err := compose.CreateComposer(
+				os.DirFS(dp),
+				dp,
+				compose.ComposerOptions{WorkingDir: workingDir},
+			)
+			if err != nil {
+				return err
+			}
+
+			return action.RunInstall()
+		},
+	}
+
 	composeCmd.Flags().StringVarP(&workingDir, "working-dir", "w", ".plasma/packages", "Working directory for temp files")
 	rootCmd.AddCommand(composeCmd)
 	return nil
-}
-
-var composeCmd = &cobra.Command{
-	Use:   "compose",
-	Short: "Composes platform",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		dp, _ := GetDiscoveryPath()
-
-		action, err := compose.CreateComposer(
-			os.DirFS(dp),
-			dp,
-			compose.ComposerOptions{WorkingDir: workingDir},
-		)
-		if err != nil {
-			return err
-		}
-
-		return action.RunInstall()
-	},
 }
 
 // GetDiscoveryPath provides actions absolute path.
