@@ -1,0 +1,6 @@
+/bin
+/build_*
+.idea
+*.tar
+*.gz
+*.gen.go

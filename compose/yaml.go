@@ -1,0 +1,129 @@
+package compose
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
+
+// PlasmaCompose stores compose definition
+type PlasmaCompose struct {
+	Name         string       `yaml:"name"`
+	Dependencies []Dependency `yaml:"dependencies,omitempty"`
+}
+
+// PlasmaLock stores lock definition
+type PlasmaLock struct {
+	Hash     string     `yaml:"hash"`
+	Packages []*Package `yaml:"packages,omitempty"`
+}
+
+// Package stores package definition
+type Package struct {
+	Name         string   `yaml:"name"`
+	Source       Source   `yaml:"source,omitempty"`
+	Dependencies []string `yaml:"dependencies,omitempty"`
+}
+
+// Dependency stores Dependency definition
+type Dependency struct {
+	Name   string `yaml:"name"`
+	Source Source `yaml:"source,omitempty"`
+}
+
+// Auth stores package source definition
+type Auth struct {
+	Name     string `yaml:"name"`
+	Password string `yaml:"password"`
+}
+
+// Source stores package source definition
+type Source struct {
+	Type string `yaml:"type"`
+	URL  string `yaml:"url"`
+	Ref  string `yaml:"ref,omitempty"`
+	Auth Auth   `yaml:"auth,omitempty"`
+}
+
+// ToPackage converts dependency to package
+func (d *Dependency) ToPackage(name string) *Package {
+	return &Package{
+		Name:   name,
+		Source: d.Source,
+	}
+}
+
+// AddDependency appends new package dependency
+func (p *Package) AddDependency(dep string) {
+	p.Dependencies = append(p.Dependencies, dep)
+}
+
+// GetName from package
+func (p *Package) GetName() string {
+	return p.Name
+}
+
+// GetType from package source
+func (p *Package) GetType() string {
+	t := p.Source.Type
+	if t == "" {
+		return gitType
+	}
+
+	return strings.ToLower(t)
+}
+
+// GetURL from package source
+func (p *Package) GetURL() string {
+	return p.Source.URL
+}
+
+// GetRef from package source
+func (p *Package) GetRef() string {
+	return p.Source.Ref
+}
+
+// GetAuth from package source
+func (p *Package) GetAuth() *Auth {
+	return &p.Source.Auth
+}
+
+func parseComposeYaml(input []byte) (*PlasmaCompose, error) {
+	cfg := PlasmaCompose{}
+	err := yaml.Unmarshal(input, &cfg)
+	return &cfg, err
+}
+
+func parseLockYaml(input []byte) (*PlasmaLock, error) {
+	cfg := PlasmaLock{}
+	err := yaml.Unmarshal(input, &cfg)
+	return &cfg, err
+}
+
+func (l *PlasmaLock) save(path string) error {
+	data, err := yaml.Marshal(l.Packages)
+	if err != nil {
+		return err
+	}
+
+	hash := getHashSum(data)
+	if hash != l.Hash {
+		l.Hash = hash
+		data, err := yaml.Marshal(l)
+		if err != nil {
+			return err
+		}
+		err = os.WriteFile(path, data, 0600)
+		return err
+	}
+
+	return nil
+}
+
+func getHashSum(data []byte) string {
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:])
+}
