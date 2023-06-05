@@ -16,7 +16,7 @@ const (
 	DependencyRoot = "root"
 )
 
-var excludedFolders = map[string]bool{".idea": true, ".plasma": true, ".git": true}
+var excludedFolders = map[string]bool{".idea": true, ".compose": true, ".git": true}
 var excludedFiles = map[string]bool{composeFile: true, composeLock: true}
 
 // Builder struct, provides methods to merge packages into build

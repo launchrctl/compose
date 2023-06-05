@@ -59,7 +59,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 		},
 	}
 
-	composeCmd.Flags().StringVarP(&workingDir, "working-dir", "w", ".plasma/packages", "Working directory for temp files")
+	composeCmd.Flags().StringVarP(&workingDir, "working-dir", "w", ".compose/packages", "Working directory for temp files")
 	rootCmd.AddCommand(composeCmd)
 	return nil
 }

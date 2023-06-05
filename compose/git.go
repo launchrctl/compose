@@ -9,10 +9,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
-const (
-	fallbackPath = "https://github.com/plasma/"
-)
-
 type gitDownloader struct{}
 
 func newGit() Downloader {
@@ -25,7 +21,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string) error {
 
 	url := pkg.GetURL()
 	if url == "" {
-		url = fallbackPath + pkg.GetName()
+		return errNoURL
 	}
 
 	options := &git.CloneOptions{

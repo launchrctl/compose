@@ -42,7 +42,7 @@ func (m DownloadManager) ensurePackagesExist() {
 }
 
 // DownloadViaLock packages using compose lock file
-func (m DownloadManager) DownloadViaLock(l *PlasmaLock, targetDir string) ([]*Package, error) {
+func (m DownloadManager) DownloadViaLock(l *YamlLock, targetDir string) ([]*Package, error) {
 	err := EnsureDirExists(targetDir)
 	if err != nil {
 		return l.Packages, err
@@ -77,7 +77,7 @@ func downloadPackage(pkg *Package, targetDir string) error {
 }
 
 // DownloadViaCompose packages using compose file
-func (m DownloadManager) DownloadViaCompose(c *PlasmaCompose, targetDir string) ([]*Package, error) {
+func (m DownloadManager) DownloadViaCompose(c *YamlCompose, targetDir string) ([]*Package, error) {
 	packages := []*Package{}
 	err := EnsureDirExists(targetDir)
 	if err != nil {
@@ -87,7 +87,7 @@ func (m DownloadManager) DownloadViaCompose(c *PlasmaCompose, targetDir string) 
 	return m.composeDownload(c, packages, nil, targetDir)
 }
 
-func (m DownloadManager) composeDownload(c *PlasmaCompose, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
+func (m DownloadManager) composeDownload(c *YamlCompose, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
 	for _, d := range c.Dependencies {
 		// build package from dependency struct
 		// add depedency if parent exists

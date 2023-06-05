@@ -13,7 +13,7 @@ import (
 const (
 	composeFile = "compose.yaml"
 	composeLock = "compose.lock"
-	buildDir    = ".plasma/build"
+	buildDir    = ".compose/build"
 )
 
 var (
@@ -25,7 +25,7 @@ type Composer struct {
 	fs      fs.FS
 	pwd     string
 	options *ComposerOptions
-	compose *PlasmaCompose
+	compose *YamlCompose
 }
 
 // ComposerOptions - list of possible composer options
@@ -61,7 +61,7 @@ func (c *Composer) RunInstall() error {
 		if err != nil {
 			return err
 		}
-		lock = &PlasmaLock{Packages: packages}
+		lock = &YamlLock{Packages: packages}
 
 		err = lock.save(filepath.Join(c.pwd, composeLock))
 		if err != nil {
@@ -118,21 +118,21 @@ func EnsureDirExists(path string) error {
 	return os.MkdirAll(path, os.ModePerm)
 }
 
-func composeLookup(fsys fs.FS) (*PlasmaCompose, error) {
+func composeLookup(fsys fs.FS) (*YamlCompose, error) {
 	f, err := fs.ReadFile(fsys, composeFile)
 	if err != nil {
-		return &PlasmaCompose{}, err
+		return &YamlCompose{}, err
 	}
 
 	cfg, err := parseComposeYaml(f)
 	if err != nil {
-		return &PlasmaCompose{}, err
+		return &YamlCompose{}, err
 	}
 
 	return cfg, nil
 }
 
-func lockLookup(fsys fs.FS) (*PlasmaLock, error) {
+func lockLookup(fsys fs.FS) (*YamlLock, error) {
 	f, err := fs.ReadFile(fsys, composeLock)
 	if err != nil {
 		return nil, err
@@ -146,7 +146,7 @@ func lockLookup(fsys fs.FS) (*PlasmaLock, error) {
 	return cfg, nil
 }
 
-func (c *Composer) getCompose() *PlasmaCompose {
+func (c *Composer) getCompose() *YamlCompose {
 	return c.compose
 }
 

@@ -9,14 +9,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// PlasmaCompose stores compose definition
-type PlasmaCompose struct {
+// YamlCompose stores compose definition
+type YamlCompose struct {
 	Name         string       `yaml:"name"`
 	Dependencies []Dependency `yaml:"dependencies,omitempty"`
 }
 
-// PlasmaLock stores lock definition
-type PlasmaLock struct {
+// YamlLock stores lock definition
+type YamlLock struct {
 	Hash     string     `yaml:"hash"`
 	Packages []*Package `yaml:"packages,omitempty"`
 }
@@ -91,19 +91,19 @@ func (p *Package) GetAuth() *Auth {
 	return &p.Source.Auth
 }
 
-func parseComposeYaml(input []byte) (*PlasmaCompose, error) {
-	cfg := PlasmaCompose{}
+func parseComposeYaml(input []byte) (*YamlCompose, error) {
+	cfg := YamlCompose{}
 	err := yaml.Unmarshal(input, &cfg)
 	return &cfg, err
 }
 
-func parseLockYaml(input []byte) (*PlasmaLock, error) {
-	cfg := PlasmaLock{}
+func parseLockYaml(input []byte) (*YamlLock, error) {
+	cfg := YamlLock{}
 	err := yaml.Unmarshal(input, &cfg)
 	return &cfg, err
 }
 
-func (l *PlasmaLock) save(path string) error {
+func (l *YamlLock) save(path string) error {
 	data, err := yaml.Marshal(l.Packages)
 	if err != nil {
 		return err
