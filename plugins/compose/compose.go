@@ -1,38 +1,39 @@
-// Package launchr implements a launchrctl/launchr plugin to do platform composition
-package launchr
+// Package compose implements a launchr plugin to do platform composition
+package compose
 
 import (
 	"os"
 	"path/filepath"
 
-	"github.com/launchrctl/compose/compose"
-	"github.com/launchrctl/launchr/core"
+	"github.com/launchrctl/launchr"
 	"github.com/spf13/cobra"
+
+	"github.com/launchrctl/compose/compose"
 )
 
 var workingDir string
 
 // ID is a plugin id.
-const ID = "actions.compose"
+const ID = "compose"
 
 func init() {
-	core.RegisterPlugin(&Plugin{})
+	launchr.RegisterPlugin(&Plugin{})
 }
 
 // Plugin is a plugin to discover actions defined in yaml.
 type Plugin struct {
-	app *core.App
+	app *launchr.App
 }
 
 // PluginInfo implements core.Plugin interface.
-func (p *Plugin) PluginInfo() core.PluginInfo {
-	return core.PluginInfo{
+func (p *Plugin) PluginInfo() launchr.PluginInfo {
+	return launchr.PluginInfo{
 		ID: ID,
 	}
 }
 
 // InitApp implements core.Plugin interface to provide discovered actions.
-func (p *Plugin) InitApp(app *core.App) error {
+func (p *Plugin) InitApp(app *launchr.App) error {
 	p.app = app
 	return nil
 }
