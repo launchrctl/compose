@@ -6,7 +6,7 @@ import (
 
 	"github.com/launchrctl/launchr"
 
-	_ "github.com/launchrctl/compose/plugins/compose"
+	_ "github.com/launchrctl/compose"
 )
 
 func main() {

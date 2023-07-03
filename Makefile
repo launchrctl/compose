@@ -50,7 +50,7 @@ build:
 	$(eval LDFLAGS:=-X '$(GOPKG).Name=launchr' -X '$(GOPKG).Version=$(APP_VERSION)' $(LDFLAGS_EXTRA))
 	$(eval BIN?=$(LOCAL_BIN)/launchr)
 	go generate ./...
-	$(BUILD_ENVPARMS) go build -ldflags "$(LDFLAGS)" $(BUILD_OPTS) -o $(BIN) ./
+	$(BUILD_ENVPARMS) go build -ldflags "$(LDFLAGS)" $(BUILD_OPTS) -o $(BIN) ./cmd/launchr
 
 # Install launchr
 .PHONY: install

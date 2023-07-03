@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/go-git/go-git/v5 v5.7.0
-	github.com/launchrctl/launchr v0.0.1
+	github.com/launchrctl/launchr v0.0.2
 	github.com/spf13/cobra v1.7.0
 	github.com/stevenle/topsort v0.2.0
 	github.com/yalue/merged_fs v1.2.3
@@ -26,7 +26,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
-	github.com/moby/term v0.0.0-20221205130635-1aeaba878587 // indirect
+	github.com/moby/term v0.5.0 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/skeema/knownhosts v1.1.1 // indirect
