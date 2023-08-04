@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/launchrctl/keyring"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -14,7 +15,7 @@ const (
 
 // Downloader interface
 type Downloader interface {
-	Download(pkg *Package, targetDir string) error
+	Download(pkg *Package, targetDir string, k keyring.Keyring) error
 }
 
 // DownloadManager struct, provides methods to fetch packages
@@ -41,8 +42,16 @@ func (m DownloadManager) ensurePackagesExist() {
 
 }
 
+func getPassword(k keyring.Keyring, url string) (keyring.CredentialsItem, error) {
+	creds, err := k.GetForURL(url)
+	if err != nil {
+		return keyring.CredentialsItem{}, err
+	}
+	return creds, nil
+}
+
 // DownloadViaLock packages using compose lock file
-func (m DownloadManager) DownloadViaLock(l *YamlLock, targetDir string) ([]*Package, error) {
+func (m DownloadManager) DownloadViaLock(l *YamlLock, targetDir string, k keyring.Keyring) ([]*Package, error) {
 	err := EnsureDirExists(targetDir)
 	if err != nil {
 		return l.Packages, err
@@ -52,7 +61,7 @@ func (m DownloadManager) DownloadViaLock(l *YamlLock, targetDir string) ([]*Pack
 	for _, p := range l.Packages {
 		p := p
 		g.Go(func() error {
-			return downloadPackage(p, targetDir)
+			return downloadPackage(p, targetDir, k)
 		})
 	}
 
@@ -63,7 +72,7 @@ func (m DownloadManager) DownloadViaLock(l *YamlLock, targetDir string) ([]*Pack
 	return l.Packages, nil
 }
 
-func downloadPackage(pkg *Package, targetDir string) error {
+func downloadPackage(pkg *Package, targetDir string, k keyring.Keyring) error {
 	downloader := getDownloaderForPackage(pkg.GetType())
 	var packagePath = filepath.Join(targetDir, pkg.GetName())
 	var downloadPath = packagePath
@@ -72,22 +81,22 @@ func downloadPackage(pkg *Package, targetDir string) error {
 		downloadPath = targetDir
 	}
 
-	err := downloader.Download(pkg, downloadPath)
+	err := downloader.Download(pkg, downloadPath, k)
 	return err
 }
 
 // DownloadViaCompose packages using compose file
-func (m DownloadManager) DownloadViaCompose(c *YamlCompose, targetDir string) ([]*Package, error) {
+func (m DownloadManager) DownloadViaCompose(c *YamlCompose, targetDir string, k keyring.Keyring) ([]*Package, error) {
 	packages := []*Package{}
 	err := EnsureDirExists(targetDir)
 	if err != nil {
 		return packages, err
 	}
 
-	return m.composeDownload(c, packages, nil, targetDir)
+	return m.composeDownload(c, packages, nil, targetDir, k)
 }
 
-func (m DownloadManager) composeDownload(c *YamlCompose, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
+func (m DownloadManager) composeDownload(c *YamlCompose, packages []*Package, parent *Package, targetDir string, k keyring.Keyring) ([]*Package, error) {
 	for _, d := range c.Dependencies {
 		// build package from dependency struct
 		// add depedency if parent exists
@@ -96,7 +105,7 @@ func (m DownloadManager) composeDownload(c *YamlCompose, packages []*Package, pa
 			parent.AddDependency(d.Name)
 		}
 
-		err := downloadPackage(pkg, targetDir)
+		err := downloadPackage(pkg, targetDir, k)
 		if err != nil {
 			return packages, err
 		}
@@ -107,7 +116,7 @@ func (m DownloadManager) composeDownload(c *YamlCompose, packages []*Package, pa
 		if _, err := os.Stat(filepath.Join(packagePath, composeFile)); !os.IsNotExist(err) {
 			cfg, err := composeLookup(os.DirFS(packagePath))
 			if err == nil {
-				packages, err = m.composeDownload(cfg, packages, pkg, targetDir)
+				packages, err = m.composeDownload(cfg, packages, pkg, targetDir, k)
 				if err != nil {
 					return packages, err
 				}
