@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/stevenle/topsort"
-	"github.com/yalue/merged_fs"
 )
 
 const (
@@ -16,7 +15,7 @@ const (
 	DependencyRoot = "root"
 )
 
-var excludedFolders = map[string]bool{".idea": true, ".compose": true, ".git": true}
+var excludedFolders = map[string]bool{".idea": true, ".compose": true}
 var excludedFiles = map[string]bool{composeFile: true, composeLock: true}
 
 // Builder struct, provides methods to merge packages into build
@@ -25,6 +24,13 @@ type Builder struct {
 	targetDir   string
 	sourcedir   string
 	graph       topsort.Graph
+}
+
+type fsEntry struct {
+	Prefix   string
+	Path     string
+	Entry    fs.FileInfo
+	Excluded bool
 }
 
 func createBuilder(platformDir, targetDir, sourcedir string, graph topsort.Graph) *Builder {
@@ -38,42 +44,32 @@ func (b *Builder) build() error {
 	}
 
 	items, _ := b.graph.TopSort(DependencyRoot)
-	var filesystems = make([]fs.FS, 0, len(items))
+	baseFs := os.DirFS(b.platformDir)
 
-	filesystems = append(filesystems, os.DirFS(b.platformDir))
-	for i := 0; i < len(items); i++ {
-		var fs fs.FS
-		if items[i] != DependencyRoot {
-			fs = os.DirFS(filepath.Join(b.sourcedir, items[i]))
-			filesystems = append(filesystems, fs)
-		}
-	}
+	entriesMap := make(map[string]*fsEntry)
+	var entriesTree []*fsEntry
 
-	merged := merged_fs.MergeMultiple(filesystems...)
-	paths := []string{}
-	dirpaths := []string{}
-
-	err = fs.WalkDir(merged, ".", func(path string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(baseFs, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
 		root := rgxPathRoot.FindString(path)
-		if excludedFolders[root] {
+		if _, ok := excludedFolders[root]; ok {
 			return nil
 		}
 
 		if !d.IsDir() {
 			filename := filepath.Base(path)
-			if excludedFiles[filename] {
+			if _, ok := excludedFiles[filename]; ok {
 				return nil
 			}
-			paths = append(paths, path)
-		} else {
-
-			dirpaths = append(dirpaths, path)
 		}
 
+		finfo, _ := d.Info()
+		entry := &fsEntry{Prefix: b.platformDir, Path: path, Entry: finfo, Excluded: false}
+		entriesTree = append(entriesTree, entry)
+		entriesMap[path] = entry
 		return nil
 	})
 
@@ -81,43 +77,112 @@ func (b *Builder) build() error {
 		return err
 	}
 
-	// prepare directories
-	for _, d := range dirpaths {
-		fmt.Println(fmt.Sprintf("create dir " + d))
-		err = os.MkdirAll(filepath.Join(b.targetDir, d), os.ModePerm)
-		if err != nil {
-			fmt.Println(err.Error())
+	for i := 0; i < len(items); i++ {
+		if items[i] != DependencyRoot {
+			// Place for merge strategies
+
+			pkgPath := filepath.Join(b.sourcedir, items[i])
+			packageFs := os.DirFS(pkgPath)
+			err = fs.WalkDir(packageFs, ".", func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+
+				finfo, _ := d.Info()
+				entry := &fsEntry{Prefix: pkgPath, Path: path, Entry: finfo, Excluded: false}
+
+				if _, ok := entriesMap[path]; !ok {
+					entriesTree = append(entriesTree, entry)
+					entriesMap[path] = entry
+				}
+
+				return nil
+			})
+
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	// try to copy files into build folder
-	fmt.Println("copying files")
-	for _, p := range paths {
-		err := copyFile(merged, b.targetDir, p)
-		if err != nil {
-			fmt.Println(err.Error())
+	for _, treeItem := range entriesTree {
+		sourcePath := filepath.Join(treeItem.Prefix, treeItem.Path)
+		destPath := filepath.Join(b.targetDir, treeItem.Path)
+
+		switch treeItem.Entry.Mode() & os.ModeType {
+		case os.ModeDir:
+			if err := createDir(destPath, os.ModePerm); err != nil {
+				return err
+			}
+		case os.ModeSymlink:
+			if err := lcopy(sourcePath, destPath); err != nil {
+				return err
+			}
+		default:
+			if err := copy(sourcePath, destPath); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-// Copies file from FS to target dir and path
-func copyFile(filesys fs.FS, target, path string) error {
-	sourceFile, err := filesys.Open(path)
+func lcopy(src, dest string) error {
+	src, err := os.Readlink(src)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	return os.Symlink(src, dest)
+}
+
+func copy(src, dst string) error {
+	sourceFileStat, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
-	defer sourceFile.Close()
 
-	newFile, err := os.Create(filepath.Clean(filepath.Join(target, path)))
+	if !sourceFileStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", src)
+	}
+
+	source, err := os.Open(filepath.Clean(src))
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
 
-	if _, err := io.Copy(newFile, sourceFile); err != nil {
+	if _, err := io.Copy(destination, source); err != nil {
 		return err
 	}
 
-	return newFile.Close()
+	return destination.Close()
+}
+
+func exists(path string) bool {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return false
+	}
+
+	return true
+}
+
+func createDir(dir string, perm os.FileMode) error {
+	if exists(dir) {
+		return nil
+	}
+
+	if err := os.MkdirAll(dir, perm); err != nil {
+		return fmt.Errorf("failed to create directory: '%s', error: '%s'", dir, err.Error())
+	}
+
+	return nil
 }
