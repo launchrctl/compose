@@ -30,7 +30,7 @@ Example:
 name: myproject
 version: 1.0.0
 dependencies:
-- package: compose-example
+- name: compose-example
   source:
     type: git
     ref: 0.0.1
