@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/launchrctl/keyring"
 )
 
 var (
@@ -33,8 +35,9 @@ func newHTTP() Downloader {
 }
 
 // Download implements Downloader.Download interface
-func (h *httpDownloader) Download(pkg *Package, targetDir string) error {
-	name := rgxNameFromURL.FindString(pkg.GetURL())
+func (h *httpDownloader) Download(pkg *Package, targetDir string, k keyring.Keyring) error {
+	url := pkg.GetURL()
+	name := rgxNameFromURL.FindString(url)
 	if name == "" {
 		return errNoURL
 	}
@@ -54,10 +57,11 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string) error {
 	}()
 
 	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, pkg.GetURL(), nil)
-	auth := pkg.GetAuth()
-	if auth != nil {
-		req.SetBasicAuth(auth.Name, auth.Password)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+
+	ci, err := getPassword(k, url)
+	if err == nil {
+		req.SetBasicAuth(ci.Username, ci.Password)
 	}
 
 	resp, err := client.Do(req)

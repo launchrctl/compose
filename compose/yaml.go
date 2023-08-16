@@ -34,18 +34,11 @@ type Dependency struct {
 	Source Source `yaml:"source,omitempty"`
 }
 
-// Auth stores package source definition
-type Auth struct {
-	Name     string `yaml:"name"`
-	Password string `yaml:"password"`
-}
-
 // Source stores package source definition
 type Source struct {
 	Type string `yaml:"type"`
 	URL  string `yaml:"url"`
 	Ref  string `yaml:"ref,omitempty"`
-	Auth Auth   `yaml:"auth,omitempty"`
 }
 
 // ToPackage converts dependency to package
@@ -84,11 +77,6 @@ func (p *Package) GetURL() string {
 // GetRef from package source
 func (p *Package) GetRef() string {
 	return p.Source.Ref
-}
-
-// GetAuth from package source
-func (p *Package) GetAuth() *Auth {
-	return &p.Source.Auth
 }
 
 func parseComposeYaml(input []byte) (*YamlCompose, error) {

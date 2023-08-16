@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/launchrctl/keyring"
 	"github.com/stevenle/topsort"
 )
 
@@ -26,6 +27,7 @@ type Composer struct {
 	pwd     string
 	options *ComposerOptions
 	compose *YamlCompose
+	k       keyring.Keyring
 }
 
 // ComposerOptions - list of possible composer options
@@ -34,13 +36,13 @@ type ComposerOptions struct {
 }
 
 // CreateComposer instance
-func CreateComposer(fs fs.FS, pwd string, opts ComposerOptions) (*Composer, error) {
+func CreateComposer(fs fs.FS, pwd string, opts ComposerOptions, k keyring.Keyring) (*Composer, error) {
 	config, err := composeLookup(fs)
 	if err != nil {
 		return nil, errComposeNotExists
 	}
 
-	return &Composer{fs, pwd, &opts, config}, nil
+	return &Composer{fs, pwd, &opts, config, k}, nil
 }
 
 // RunInstall on composr
@@ -52,12 +54,12 @@ func (c *Composer) RunInstall() error {
 	buildDir := c.getBuildDirPath()
 
 	if lock != nil {
-		_, err := dm.DownloadViaLock(lock, packagesDir)
+		_, err := dm.DownloadViaLock(lock, packagesDir, c.getKeyring())
 		if err != nil {
 			return err
 		}
 	} else {
-		packages, err := dm.DownloadViaCompose(c.getCompose(), packagesDir)
+		packages, err := dm.DownloadViaCompose(c.getCompose(), packagesDir, c.getKeyring())
 		if err != nil {
 			return err
 		}
@@ -152,4 +154,8 @@ func (c *Composer) getCompose() *YamlCompose {
 
 func (c *Composer) getFS() fs.FS {
 	return c.fs
+}
+
+func (c *Composer) getKeyring() keyring.Keyring {
+	return c.k
 }

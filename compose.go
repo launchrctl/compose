@@ -4,6 +4,7 @@ package compose
 import (
 	"os"
 
+	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
 	"github.com/spf13/cobra"
 
@@ -42,14 +43,16 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	// CLI command to discover actions in file structure and provide
 	var composeCmd = &cobra.Command{
 		Use:   "compose",
-		Short: "Composes platform",
+		Short: "Composes filesystem (files & dirs)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dp := p.app.GetWD()
 
+			k := launchr.GetService[keyring.Keyring](p.app)
 			action, err := compose.CreateComposer(
 				os.DirFS(dp),
 				dp,
 				compose.ComposerOptions{WorkingDir: workingDir},
+				k,
 			)
 			if err != nil {
 				return err
