@@ -39,6 +39,7 @@ type Source struct {
 	Type string `yaml:"type"`
 	URL  string `yaml:"url"`
 	Ref  string `yaml:"ref,omitempty"`
+	Tag  string `yaml:"tag,omitempty"`
 }
 
 // ToPackage converts dependency to package
@@ -77,6 +78,11 @@ func (p *Package) GetURL() string {
 // GetRef from package source
 func (p *Package) GetRef() string {
 	return p.Source.Ref
+}
+
+// GetTag from package source
+func (p *Package) GetTag() string {
+	return p.Source.Tag
 }
 
 func parseComposeYaml(input []byte) (*YamlCompose, error) {

@@ -30,6 +30,8 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, k keyring.Keyri
 		Progress: os.Stdout,
 	}
 	if pkg.GetRef() != "" {
+		options.ReferenceName = plumbing.NewBranchReferenceName(pkg.GetRef())
+	} else if pkg.GetTag() != "" {
 		options.ReferenceName = plumbing.NewTagReferenceName(pkg.GetRef())
 	}
 

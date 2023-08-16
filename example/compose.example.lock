@@ -4,7 +4,7 @@ packages:
       source:
         type: git
         url: https://github.com/iignatevich/compose-dependency-example.git
-        ref: 0.0.1
+        ref: branch-name
     - name: compose-example-http
       source:
         type: http
@@ -13,7 +13,7 @@ packages:
       source:
         type: git
         url: https://github.com/iignatevich/compose-example.git
-        ref: 0.0.7
+        ref: branch-name
       dependencies:
         - compose-dependency-example
         - compose-example-http
