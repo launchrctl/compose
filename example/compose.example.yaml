@@ -4,5 +4,6 @@ dependencies:
   - package: compose-example
     source:
       type: git
-      ref: 0.0.7
       url: https://github.com/iignatevich/compose-example.git
+      # ref: branch-name
+      # tag: tag-name
