@@ -1,7 +1,7 @@
 name: myproject
 version: 1.0.0
 dependencies:
-  - package: compose-example
+  - name: compose-example
     source:
       type: git
       url: https://github.com/iignatevich/compose-example.git
