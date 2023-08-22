@@ -108,18 +108,26 @@ func (b *Builder) build() error {
 	for _, treeItem := range entriesTree {
 		sourcePath := filepath.Join(treeItem.Prefix, treeItem.Path)
 		destPath := filepath.Join(b.targetDir, treeItem.Path)
+		isSymlink := false
 
 		switch treeItem.Entry.Mode() & os.ModeType {
 		case os.ModeDir:
-			if err := createDir(destPath, os.ModePerm); err != nil {
+			if err := createDir(destPath, treeItem.Entry.Mode()); err != nil {
 				return err
 			}
 		case os.ModeSymlink:
 			if err := lcopy(sourcePath, destPath); err != nil {
 				return err
 			}
+			isSymlink = true
 		default:
 			if err := copy(sourcePath, destPath); err != nil {
+				return err
+			}
+		}
+
+		if !isSymlink {
+			if err := os.Chmod(destPath, treeItem.Entry.Mode()); err != nil {
 				return err
 			}
 		}
