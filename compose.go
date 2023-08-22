@@ -23,7 +23,7 @@ type Plugin struct {
 
 // PluginInfo implements launchr.Plugin interface.
 func (p *Plugin) PluginInfo() launchr.PluginInfo {
-	return launchr.PluginInfo{}
+	return launchr.PluginInfo{Weight: 10}
 }
 
 // OnAppInit implements launchr.Plugin interface.
@@ -40,6 +40,8 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 		Use:   "compose",
 		Short: "Composes filesystem (files & dirs)",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Don't show usage help on a runtime error.
+			cmd.SilenceUsage = true
 			c, err := compose.CreateComposer(
 				os.DirFS(p.wd),
 				p.wd,

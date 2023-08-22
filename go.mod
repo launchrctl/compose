@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/go-git/go-git/v5 v5.8.1
 	github.com/launchrctl/keyring v0.1.0
-	github.com/launchrctl/launchr v0.1.0
+	github.com/launchrctl/launchr v0.1.1
 	github.com/spf13/cobra v1.7.0
 	github.com/stevenle/topsort v0.2.0
 	golang.org/x/sync v0.3.0
