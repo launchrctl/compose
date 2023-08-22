@@ -11,12 +11,12 @@ import (
 )
 
 const (
-	// DependencyRoot is dependecies graph main node
+	// DependencyRoot is a dependencies graph main node
 	DependencyRoot = "root"
 )
 
-var excludedFolders = map[string]bool{".idea": true, ".compose": true}
-var excludedFiles = map[string]bool{composeFile: true, composeLock: true}
+var excludedFolders = map[string]struct{}{".idea": {}, ".compose": {}}
+var excludedFiles = map[string]struct{}{composeFile: {}, composeLock: {}}
 
 // Builder struct, provides methods to merge packages into build
 type Builder struct {

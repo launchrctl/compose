@@ -11,54 +11,46 @@ import (
 	"github.com/launchrctl/compose/compose"
 )
 
-var workingDir string
-
-// ID is a plugin id.
-const ID = "compose"
-
 func init() {
 	launchr.RegisterPlugin(&Plugin{})
 }
 
-// Plugin is a plugin to discover actions defined in yaml.
+// Plugin implements launchr.Plugin to provide compose functionality.
 type Plugin struct {
-	app *launchr.App
+	wd string
+	k  keyring.Keyring
 }
 
 // PluginInfo implements launchr.Plugin interface.
 func (p *Plugin) PluginInfo() launchr.PluginInfo {
-	return launchr.PluginInfo{
-		ID: ID,
-	}
+	return launchr.PluginInfo{}
 }
 
-// InitApp implements launchr.Plugin interface to provide discovered actions.
-func (p *Plugin) InitApp(app *launchr.App) error {
-	p.app = app
+// OnAppInit implements launchr.Plugin interface.
+func (p *Plugin) OnAppInit(app launchr.App) error {
+	app.GetService(p.k)
+	p.wd = app.GetWD()
 	return nil
 }
 
-// CobraAddCommands implements launchr.CobraPlugin interface to provide discovered actions.
+// CobraAddCommands implements launchr.CobraPlugin interface to provide compose functionality.
 func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
-	// CLI command to discover actions in file structure and provide
+	var workingDir string
 	var composeCmd = &cobra.Command{
 		Use:   "compose",
 		Short: "Composes filesystem (files & dirs)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			dp := p.app.GetWD()
-
-			k := launchr.GetService[keyring.Keyring](p.app)
-			action, err := compose.CreateComposer(
-				os.DirFS(dp),
-				dp,
+			c, err := compose.CreateComposer(
+				os.DirFS(p.wd),
+				p.wd,
 				compose.ComposerOptions{WorkingDir: workingDir},
-				k,
+				p.k,
 			)
 			if err != nil {
 				return err
 			}
 
-			return action.RunInstall()
+			return c.RunInstall()
 		},
 	}
 
