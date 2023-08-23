@@ -32,7 +32,8 @@ type Composer struct {
 
 // ComposerOptions - list of possible composer options
 type ComposerOptions struct {
-	WorkingDir string
+	WorkingDir       string
+	SkipNotVersioned bool
 }
 
 // CreateComposer instance
@@ -76,7 +77,7 @@ func (c *Composer) RunInstall() error {
 
 	// build graph and merge packages in build dir
 	graph := buildDependenciesGraph(lock.Packages)
-	builder := createBuilder(c.pwd, buildDir, packagesDir, *graph)
+	builder := createBuilder(c.pwd, buildDir, packagesDir, c.options.SkipNotVersioned, *graph)
 	return builder.build()
 }
 

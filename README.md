@@ -13,8 +13,9 @@ launchr compose [options]
 Where options are:
 * -w, --working-dir : The directory where temporary files should be stored during the
   composition process. Default is the .compose/packages
+* -s, --skip-not-versioned : Skip not versioned files from source directory (git only)
 
-example usage - `launchr compose -w=./folder/something`
+example usage - `launchr compose -w=./folder/something -s=1 or -s=true`
 
 ### `compose.yaml` File Format
 The "compose.yaml" file is a text file that specifies the dependencies for a package, along with any necessary metadata and sources for those dependencies.
@@ -33,12 +34,9 @@ dependencies:
 - name: compose-example
   source:
     type: git
-    ref: 0.0.1
+    ref: master
+    tag: 0.0.1
     url: https://github.com/example/compose-example.git
-    # temporary basic auth (http)
-    auth: 
-      name: abc
-      password: bbc
 ```
 
 `Lock example`
@@ -50,7 +48,8 @@ packages:
     source:
       type: git
       url: https://github.com/example/compose-dependency-example.git
-      ref: 0.0.1
+      ref: master
+      tag: 0.0.1
   - name: compose-example-http
     source:
       type: http
@@ -59,11 +58,8 @@ packages:
     source:
       type: git
       url: https://github.com/example/compose-example.git
-      ref: 0.0.7
-      # temporary basic auth
-      auth:
-        name: abc
-        password: bbc
+      ref: master
+      tag: 0.0.7
     dependencies:
       - compose-dependency-example
       - compose-example-http
@@ -80,9 +76,3 @@ The composition tool fetches and installs dependencies for a package by recursiv
 5. Repeat steps 1-4 for each package and its dependencies.
 
 During this process, the composition tool keeps track of the dependencies for each package.
-
-#TO-DO
-
-- [ ] add concurrent download for first compose when packagist-like platform will be available.
-- [ ] checksums for packages
-- [ ] merging strategies

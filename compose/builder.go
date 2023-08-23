@@ -6,13 +6,17 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stevenle/topsort"
 )
 
 const (
 	// DependencyRoot is a dependencies graph main node
 	DependencyRoot = "root"
+	gitPrefix      = ".git"
 )
 
 var excludedFolders = map[string]struct{}{".idea": {}, ".compose": {}}
@@ -20,10 +24,11 @@ var excludedFiles = map[string]struct{}{composeFile: {}, composeLock: {}}
 
 // Builder struct, provides methods to merge packages into build
 type Builder struct {
-	platformDir string
-	targetDir   string
-	sourcedir   string
-	graph       topsort.Graph
+	platformDir      string
+	targetDir        string
+	sourcedir        string
+	skipNotVersioned bool
+	graph            topsort.Graph
 }
 
 type fsEntry struct {
@@ -33,14 +38,49 @@ type fsEntry struct {
 	Excluded bool
 }
 
-func createBuilder(platformDir, targetDir, sourcedir string, graph topsort.Graph) *Builder {
-	return &Builder{platformDir, targetDir, sourcedir, graph}
+func createBuilder(platformDir, targetDir, sourcedir string, skipNotVersioned bool, graph topsort.Graph) *Builder {
+	return &Builder{platformDir, targetDir, sourcedir, skipNotVersioned, graph}
+}
+
+func getVersionedMap(gitDir string) (map[string]bool, error) {
+	versionedFiles := make(map[string]bool)
+	repo, err := git.PlainOpen(gitDir)
+	if err != nil {
+		return versionedFiles, err
+	}
+	head, err := repo.Head()
+	if err != nil {
+		return versionedFiles, err
+	}
+
+	commit, _ := repo.CommitObject(head.Hash())
+	tree, _ := commit.Tree()
+	tree.Files().ForEach(func(f *object.File) error {
+		dir := filepath.Dir(f.Name)
+		if _, ok := versionedFiles[dir]; !ok {
+			versionedFiles[dir] = true
+		}
+
+		versionedFiles[f.Name] = true
+		return nil
+	})
+
+	return versionedFiles, nil
 }
 
 func (b *Builder) build() error {
 	err := EnsureDirExists(b.targetDir)
 	if err != nil {
 		return err
+	}
+
+	versionedMap := make(map[string]bool)
+	checkVersioned := b.skipNotVersioned
+	if checkVersioned {
+		versionedMap, err = getVersionedMap(b.platformDir)
+		if err != nil {
+			checkVersioned = false
+		}
 	}
 
 	items, _ := b.graph.TopSort(DependencyRoot)
@@ -66,6 +106,13 @@ func (b *Builder) build() error {
 			}
 		}
 
+		// Add .git folder into entriesTree whenever checkversioned or not
+		if checkVersioned && !strings.HasPrefix(path, gitPrefix) {
+			if _, ok := versionedMap[path]; !ok {
+				return nil
+			}
+		}
+
 		finfo, _ := d.Info()
 		entry := &fsEntry{Prefix: b.platformDir, Path: path, Entry: finfo, Excluded: false}
 		entriesTree = append(entriesTree, entry)
@@ -86,6 +133,11 @@ func (b *Builder) build() error {
 			err = fs.WalkDir(packageFs, ".", func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err
+				}
+
+				// Skip .git folder from packages
+				if strings.HasPrefix(path, gitPrefix) {
+					return nil
 				}
 
 				finfo, _ := d.Info()
