@@ -22,13 +22,71 @@ const (
 var excludedFolders = map[string]struct{}{".idea": {}, ".compose": {}}
 var excludedFiles = map[string]struct{}{composeFile: {}, composeLock: {}}
 
+type mergeStrategyType int64
+type mergeStrategyTarget int64
+type mergeStrategy struct {
+	s mergeStrategyType
+	t mergeStrategyTarget
+	p string
+}
+
+const (
+	undefinedStrategy       mergeStrategyType   = iota
+	overwriteLocalFile      mergeStrategyType   = 1
+	removeExtraLocalFiles   mergeStrategyType   = 2
+	ignoreExtraPackageFiles mergeStrategyType   = 3
+	localStrategy           mergeStrategyTarget = 1
+	packageStrategy         mergeStrategyTarget = 2
+)
+
+func retrieveStrategies(packages []*Package) ([]*mergeStrategy, map[string][]*mergeStrategy) {
+	var ls []*mergeStrategy
+	ps := make(map[string][]*mergeStrategy)
+	for _, pkg := range packages {
+		var strategies []*mergeStrategy
+		for _, item := range pkg.GetStrategies() {
+			s, t := identifyStrategy(item.Name)
+			if s == undefinedStrategy {
+				continue
+			}
+			strategy := &mergeStrategy{s, t, item.Path}
+
+			if t == localStrategy {
+				ls = append(ls, strategy)
+			} else {
+				strategies = append(strategies, strategy)
+			}
+		}
+		ps[pkg.GetName()] = strategies
+	}
+
+	return ls, ps
+}
+
+func identifyStrategy(name string) (mergeStrategyType, mergeStrategyTarget) {
+	s := undefinedStrategy
+	t := packageStrategy
+
+	switch name {
+	case "overwrite-local-file":
+		s = overwriteLocalFile
+	case "remove-extra-local-files":
+		s = removeExtraLocalFiles
+		t = localStrategy
+	case "ignore-extra-package-files":
+		s = ignoreExtraPackageFiles
+	}
+
+	return s, t
+}
+
 // Builder struct, provides methods to merge packages into build
 type Builder struct {
 	platformDir      string
 	targetDir        string
-	sourcedir        string
+	sourceDir        string
 	skipNotVersioned bool
-	graph            topsort.Graph
+	packages         []*Package
 }
 
 type fsEntry struct {
@@ -38,8 +96,8 @@ type fsEntry struct {
 	Excluded bool
 }
 
-func createBuilder(platformDir, targetDir, sourcedir string, skipNotVersioned bool, graph topsort.Graph) *Builder {
-	return &Builder{platformDir, targetDir, sourcedir, skipNotVersioned, graph}
+func createBuilder(platformDir, targetDir, sourceDir string, skipNotVersioned bool, packages []*Package) *Builder {
+	return &Builder{platformDir, targetDir, sourceDir, skipNotVersioned, packages}
 }
 
 func getVersionedMap(gitDir string) (map[string]bool, error) {
@@ -55,7 +113,7 @@ func getVersionedMap(gitDir string) (map[string]bool, error) {
 
 	commit, _ := repo.CommitObject(head.Hash())
 	tree, _ := commit.Tree()
-	tree.Files().ForEach(func(f *object.File) error {
+	err = tree.Files().ForEach(func(f *object.File) error {
 		dir := filepath.Dir(f.Name)
 		if _, ok := versionedFiles[dir]; !ok {
 			versionedFiles[dir] = true
@@ -65,7 +123,7 @@ func getVersionedMap(gitDir string) (map[string]bool, error) {
 		return nil
 	})
 
-	return versionedFiles, nil
+	return versionedFiles, err
 }
 
 func (b *Builder) build() error {
@@ -83,7 +141,7 @@ func (b *Builder) build() error {
 		}
 	}
 
-	items, _ := b.graph.TopSort(DependencyRoot)
+	ls, ps := retrieveStrategies(b.packages)
 	baseFs := os.DirFS(b.platformDir)
 
 	entriesMap := make(map[string]*fsEntry)
@@ -106,6 +164,15 @@ func (b *Builder) build() error {
 			}
 		}
 
+		// Apply strategies that target local files
+		for _, localStrategy := range ls {
+			if localStrategy.s == removeExtraLocalFiles {
+				if strings.HasPrefix(path, localStrategy.p) {
+					return nil
+				}
+			}
+		}
+
 		// Add .git folder into entriesTree whenever checkversioned or not
 		if checkVersioned && !strings.HasPrefix(path, gitPrefix) {
 			if _, ok := versionedMap[path]; !ok {
@@ -124,12 +191,14 @@ func (b *Builder) build() error {
 		return err
 	}
 
+	graph := buildDependenciesGraph(b.packages)
+	items, _ := graph.TopSort(DependencyRoot)
 	for i := 0; i < len(items); i++ {
-		if items[i] != DependencyRoot {
-			// Place for merge strategies
-
-			pkgPath := filepath.Join(b.sourcedir, items[i])
+		pkgName := items[i]
+		if pkgName != DependencyRoot {
+			pkgPath := filepath.Join(b.sourceDir, pkgName)
 			packageFs := os.DirFS(pkgPath)
+			strategies, ok := ps[pkgName]
 			err = fs.WalkDir(packageFs, ".", func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err
@@ -143,9 +212,33 @@ func (b *Builder) build() error {
 				finfo, _ := d.Info()
 				entry := &fsEntry{Prefix: pkgPath, Path: path, Entry: finfo, Excluded: false}
 
-				if _, ok := entriesMap[path]; !ok {
-					entriesTree = append(entriesTree, entry)
-					entriesMap[path] = entry
+				if !ok {
+					// No strategies for package. Proceed with default merge.
+					entriesTree, entriesMap = addEntries(entriesTree, entriesMap, entry, path)
+				} else {
+					// Apply strategies package strategies
+					for _, ms := range strategies {
+						if !strings.HasPrefix(path, ms.p) {
+							continue
+						}
+
+						switch ms.s {
+						case overwriteLocalFile:
+							if localMapEntry, ok := entriesMap[path]; !ok {
+								entriesTree = append(entriesTree, entry)
+								entriesMap[path] = entry
+							} else if strings.HasPrefix(path, ms.p) {
+								localMapEntry.Prefix = entry.Prefix
+								localMapEntry.Entry = entry.Entry
+							}
+						case ignoreExtraPackageFiles:
+							// just do nothing and skip
+						}
+
+						return nil
+					}
+
+					entriesTree, entriesMap = addEntries(entriesTree, entriesMap, entry, path)
 				}
 
 				return nil
@@ -173,7 +266,7 @@ func (b *Builder) build() error {
 			}
 			isSymlink = true
 		default:
-			if err := copy(sourcePath, destPath); err != nil {
+			if err := fcopy(sourcePath, destPath); err != nil {
 				return err
 			}
 		}
@@ -188,6 +281,42 @@ func (b *Builder) build() error {
 	return nil
 }
 
+func addEntries(entriesTree []*fsEntry, entriesMap map[string]*fsEntry, entry *fsEntry, path string) ([]*fsEntry, map[string]*fsEntry) {
+	if _, ok := entriesMap[path]; !ok {
+		entriesTree = append(entriesTree, entry)
+		entriesMap[path] = entry
+	}
+
+	return entriesTree, entriesMap
+}
+
+func buildDependenciesGraph(packages []*Package) *topsort.Graph {
+	graph := topsort.NewGraph()
+	packageNames := make(map[string]bool)
+
+	for _, a := range packages {
+		if _, k := packageNames[a.GetName()]; !k {
+			packageNames[a.GetName()] = true
+		}
+
+		graph.AddNode(a.GetName())
+		if a.Dependencies != nil {
+			for _, d := range a.Dependencies {
+				_ = graph.AddEdge(a.GetName(), d)
+				packageNames[d] = false
+			}
+		}
+	}
+
+	for n, k := range packageNames {
+		if k {
+			_ = graph.AddEdge(DependencyRoot, n)
+		}
+	}
+
+	return graph
+}
+
 func lcopy(src, dest string) error {
 	src, err := os.Readlink(src)
 	if err != nil {
@@ -199,7 +328,7 @@ func lcopy(src, dest string) error {
 	return os.Symlink(src, dest)
 }
 
-func copy(src, dst string) error {
+func fcopy(src, dst string) error {
 	sourceFileStat, err := os.Stat(src)
 	if err != nil {
 		return err

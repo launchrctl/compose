@@ -34,12 +34,19 @@ type Dependency struct {
 	Source Source `yaml:"source,omitempty"`
 }
 
+// Strategy stores packages merge strategy name and path
+type Strategy struct {
+	Name string `yaml:"name"`
+	Path string `yaml:"path"`
+}
+
 // Source stores package source definition
 type Source struct {
-	Type string `yaml:"type"`
-	URL  string `yaml:"url"`
-	Ref  string `yaml:"ref,omitempty"`
-	Tag  string `yaml:"tag,omitempty"`
+	Type       string     `yaml:"type"`
+	URL        string     `yaml:"url"`
+	Ref        string     `yaml:"ref,omitempty"`
+	Tag        string     `yaml:"tag,omitempty"`
+	Strategies []Strategy `yaml:"strategy,omitempty"`
 }
 
 // ToPackage converts dependency to package
@@ -53,6 +60,11 @@ func (d *Dependency) ToPackage(name string) *Package {
 // AddDependency appends new package dependency
 func (p *Package) AddDependency(dep string) {
 	p.Dependencies = append(p.Dependencies, dep)
+}
+
+// GetStrategies from package
+func (p *Package) GetStrategies() []Strategy {
+	return p.Source.Strategies
 }
 
 // GetName from package

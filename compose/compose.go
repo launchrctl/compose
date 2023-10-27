@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/launchrctl/keyring"
-	"github.com/stevenle/topsort"
 )
 
 const (
@@ -75,9 +74,7 @@ func (c *Composer) RunInstall() error {
 	// ensure all packages downloaded / warn user
 	dm.ensurePackagesExist()
 
-	// build graph and merge packages in build dir
-	graph := buildDependenciesGraph(lock.Packages)
-	builder := createBuilder(c.pwd, buildDir, packagesDir, c.options.SkipNotVersioned, *graph)
+	builder := createBuilder(c.pwd, buildDir, packagesDir, c.options.SkipNotVersioned, lock.Packages)
 	return builder.build()
 }
 
@@ -87,33 +84,6 @@ func (c *Composer) getBuildDirPath() string {
 
 func (c *Composer) getPackagesDirPath() string {
 	return filepath.Join(c.pwd, c.options.WorkingDir)
-}
-
-func buildDependenciesGraph(packages []*Package) *topsort.Graph {
-	graph := topsort.NewGraph()
-	packageNames := make(map[string]bool)
-
-	for _, a := range packages {
-		if _, k := packageNames[a.GetName()]; !k {
-			packageNames[a.GetName()] = true
-		}
-
-		graph.AddNode(a.GetName())
-		if a.Dependencies != nil {
-			for _, d := range a.Dependencies {
-				_ = graph.AddEdge(a.GetName(), d)
-				packageNames[d] = false
-			}
-		}
-	}
-
-	for n, k := range packageNames {
-		if k {
-			_ = graph.AddEdge(DependencyRoot, n)
-		}
-	}
-
-	return graph
 }
 
 // EnsureDirExists checks if directory exists, otherwise create it
