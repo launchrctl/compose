@@ -22,8 +22,9 @@ const (
 var excludedFolders = map[string]struct{}{".idea": {}, ".compose": {}}
 var excludedFiles = map[string]struct{}{composeFile: {}, composeLock: {}}
 
-type mergeStrategyType int64
-type mergeStrategyTarget int64
+type mergeConflictResolve uint8
+type mergeStrategyType uint8
+type mergeStrategyTarget uint8
 type mergeStrategy struct {
 	s mergeStrategyType
 	t mergeStrategyTarget
@@ -31,13 +32,18 @@ type mergeStrategy struct {
 }
 
 const (
-	undefinedStrategy       mergeStrategyType   = iota
-	overwriteLocalFile      mergeStrategyType   = 1
-	removeExtraLocalFiles   mergeStrategyType   = 2
-	ignoreExtraPackageFiles mergeStrategyType   = 3
-	localStrategy           mergeStrategyTarget = 1
-	packageStrategy         mergeStrategyTarget = 2
+	undefinedStrategy       mergeStrategyType    = iota
+	overwriteLocalFile      mergeStrategyType    = 1
+	removeExtraLocalFiles   mergeStrategyType    = 2
+	ignoreExtraPackageFiles mergeStrategyType    = 3
+	noConflict              mergeConflictResolve = iota
+	resolveToLocal          mergeConflictResolve = 1
+	resolveToPackage        mergeConflictResolve = 2
+	localStrategy           mergeStrategyTarget  = 1
+	packageStrategy         mergeStrategyTarget  = 2
 )
+
+// return conflict const (0 - no warning, 1 - conflict with local, 2 conflict with pacakge)
 
 func retrieveStrategies(packages []*Package) ([]*mergeStrategy, map[string][]*mergeStrategy) {
 	var ls []*mergeStrategy
@@ -86,6 +92,7 @@ type Builder struct {
 	targetDir        string
 	sourceDir        string
 	skipNotVersioned bool
+	logConflicts     bool
 	packages         []*Package
 }
 
@@ -94,10 +101,11 @@ type fsEntry struct {
 	Path     string
 	Entry    fs.FileInfo
 	Excluded bool
+	From     string
 }
 
-func createBuilder(platformDir, targetDir, sourceDir string, skipNotVersioned bool, packages []*Package) *Builder {
-	return &Builder{platformDir, targetDir, sourceDir, skipNotVersioned, packages}
+func createBuilder(platformDir, targetDir, sourceDir string, skipNotVersioned, logConflicts bool, packages []*Package) *Builder {
+	return &Builder{platformDir, targetDir, sourceDir, skipNotVersioned, logConflicts, packages}
 }
 
 func getVersionedMap(gitDir string) (map[string]bool, error) {
@@ -147,6 +155,7 @@ func (b *Builder) build() error {
 	entriesMap := make(map[string]*fsEntry)
 	var entriesTree []*fsEntry
 
+	// @todo move to function
 	err = fs.WalkDir(baseFs, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -181,7 +190,7 @@ func (b *Builder) build() error {
 		}
 
 		finfo, _ := d.Info()
-		entry := &fsEntry{Prefix: b.platformDir, Path: path, Entry: finfo, Excluded: false}
+		entry := &fsEntry{Prefix: b.platformDir, Path: path, Entry: finfo, Excluded: false, From: "domain"}
 		entriesTree = append(entriesTree, entry)
 		entriesMap[path] = entry
 		return nil
@@ -193,6 +202,11 @@ func (b *Builder) build() error {
 
 	graph := buildDependenciesGraph(b.packages)
 	items, _ := graph.TopSort(DependencyRoot)
+
+	if b.logConflicts {
+		fmt.Print("Conflicting files:\n")
+	}
+
 	for i := 0; i < len(items); i++ {
 		pkgName := items[i]
 		if pkgName != DependencyRoot {
@@ -209,36 +223,19 @@ func (b *Builder) build() error {
 					return nil
 				}
 
+				var conflictReslv mergeConflictResolve
 				finfo, _ := d.Info()
-				entry := &fsEntry{Prefix: pkgPath, Path: path, Entry: finfo, Excluded: false}
+				entry := &fsEntry{Prefix: pkgPath, Path: path, Entry: finfo, Excluded: false, From: pkgName}
 
 				if !ok {
 					// No strategies for package. Proceed with default merge.
-					entriesTree, entriesMap = addEntries(entriesTree, entriesMap, entry, path)
+					entriesTree, conflictReslv = addEntries(entriesTree, entriesMap, entry, path)
 				} else {
-					// Apply strategies package strategies
-					for _, ms := range strategies {
-						if !strings.HasPrefix(path, ms.p) {
-							continue
-						}
+					entriesTree, conflictReslv = addStrategyEntries(strategies, entriesTree, entriesMap, entry, path)
+				}
 
-						switch ms.s {
-						case overwriteLocalFile:
-							if localMapEntry, ok := entriesMap[path]; !ok {
-								entriesTree = append(entriesTree, entry)
-								entriesMap[path] = entry
-							} else if strings.HasPrefix(path, ms.p) {
-								localMapEntry.Prefix = entry.Prefix
-								localMapEntry.Entry = entry.Entry
-							}
-						case ignoreExtraPackageFiles:
-							// just do nothing and skip
-						}
-
-						return nil
-					}
-
-					entriesTree, entriesMap = addEntries(entriesTree, entriesMap, entry, path)
+				if b.logConflicts && !finfo.IsDir() {
+					logConflictResolve(conflictReslv, path, pkgName, entriesMap[path])
 				}
 
 				return nil
@@ -250,6 +247,7 @@ func (b *Builder) build() error {
 		}
 	}
 
+	// @todo check rsync
 	for _, treeItem := range entriesTree {
 		sourcePath := filepath.Join(treeItem.Prefix, treeItem.Path)
 		destPath := filepath.Join(b.targetDir, treeItem.Path)
@@ -281,13 +279,57 @@ func (b *Builder) build() error {
 	return nil
 }
 
-func addEntries(entriesTree []*fsEntry, entriesMap map[string]*fsEntry, entry *fsEntry, path string) ([]*fsEntry, map[string]*fsEntry) {
+func logConflictResolve(resolveto mergeConflictResolve, path, pkgName string, entry *fsEntry) {
+	if resolveto == noConflict {
+		return
+	}
+
+	fmt.Printf("[%s] - %s > Selected from %s\n", pkgName, path, entry.From)
+}
+
+func addEntries(entriesTree []*fsEntry, entriesMap map[string]*fsEntry, entry *fsEntry, path string) ([]*fsEntry, mergeConflictResolve) {
+	conflictReslv := noConflict
 	if _, ok := entriesMap[path]; !ok {
 		entriesTree = append(entriesTree, entry)
 		entriesMap[path] = entry
+	} else {
+		// Be default all conflicts auto-resolved to local.
+		conflictReslv = resolveToLocal
 	}
 
-	return entriesTree, entriesMap
+	return entriesTree, conflictReslv
+}
+
+func addStrategyEntries(strategies []*mergeStrategy, entriesTree []*fsEntry, entriesMap map[string]*fsEntry, entry *fsEntry, path string) ([]*fsEntry, mergeConflictResolve) {
+	conflictReslv := noConflict
+
+	// Apply strategies package strategies
+	for _, ms := range strategies {
+		if !strings.HasPrefix(path, ms.p) {
+			continue
+		}
+
+		switch ms.s {
+		case overwriteLocalFile:
+			if localMapEntry, ok := entriesMap[path]; !ok {
+				entriesTree = append(entriesTree, entry)
+				entriesMap[path] = entry
+			} else if strings.HasPrefix(path, ms.p) {
+				localMapEntry.Prefix = entry.Prefix
+				localMapEntry.Entry = entry.Entry
+				localMapEntry.From = entry.From
+
+				// Strategy replaces local path by package one.
+				conflictReslv = resolveToPackage
+			}
+		case ignoreExtraPackageFiles:
+			// just do nothing and skip
+		}
+
+		return entriesTree, conflictReslv
+	}
+
+	return addEntries(entriesTree, entriesMap, entry, path)
 }
 
 func buildDependenciesGraph(packages []*Package) *topsort.Graph {

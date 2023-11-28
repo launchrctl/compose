@@ -37,6 +37,7 @@ func (p *Plugin) OnAppInit(app launchr.App) error {
 func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	var workingDir string
 	var skipNotVersioned bool
+	var conflictsVerbosity bool
 	var composeCmd = &cobra.Command{
 		Use:   "compose",
 		Short: "Composes filesystem (files & dirs)",
@@ -46,7 +47,11 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 			c, err := compose.CreateComposer(
 				os.DirFS(p.wd),
 				p.wd,
-				compose.ComposerOptions{WorkingDir: workingDir, SkipNotVersioned: skipNotVersioned},
+				compose.ComposerOptions{
+					WorkingDir:         workingDir,
+					SkipNotVersioned:   skipNotVersioned,
+					ConflictsVerbosity: conflictsVerbosity,
+				},
 				p.k,
 			)
 			if err != nil {
@@ -59,6 +64,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 
 	composeCmd.Flags().StringVarP(&workingDir, "working-dir", "w", ".compose/packages", "Working directory for temp files")
 	composeCmd.Flags().BoolVarP(&skipNotVersioned, "skip-not-versioned", "s", false, "Skip not versioned files from source directory (git only)")
+	composeCmd.Flags().BoolVar(&conflictsVerbosity, "conflicts-verbosity", false, "Log files conflicts")
 	rootCmd.AddCommand(composeCmd)
 	return nil
 }

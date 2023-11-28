@@ -14,8 +14,9 @@ Where options are:
 * -w, --working-dir : The directory where temporary files should be stored during the
   composition process. Default is the .compose/packages
 * -s, --skip-not-versioned : Skip not versioned files from source directory (git only)
+* --conflicts-verbosity: Log files conflicts in format "[curent-package] - path to file > Selectef from [domain, other package or current-package]"
 
-example usage - `launchr compose -w=./folder/something -s=1 or -s=true`
+example usage - `launchr compose -w=./folder/something -s=1 or -s=true --conflicts-verbosity`
 
 ### `compose.yaml` File Format
 The "compose.yaml" file is a text file that specifies the dependencies for a package, along with any necessary metadata and sources for those dependencies.
