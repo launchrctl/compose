@@ -190,7 +190,7 @@ func (b *Builder) build() error {
 		}
 
 		finfo, _ := d.Info()
-		entry := &fsEntry{Prefix: b.platformDir, Path: path, Entry: finfo, Excluded: false, From: "domain"}
+		entry := &fsEntry{Prefix: b.platformDir, Path: path, Entry: finfo, Excluded: false, From: "domain repo"}
 		entriesTree = append(entriesTree, entry)
 		entriesMap[path] = entry
 		return nil
