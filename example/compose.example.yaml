@@ -4,6 +4,13 @@ dependencies:
   - name: compose-example
     source:
       type: git
-      url: https://github.com/iignatevich/compose-example.git
+      url: https://github.com/example/compose-example.git
       # ref: branch-name
       # tag: tag-name
+      strategy:
+        - name: remove-extra-local-files
+          path: path/to/folder
+        - name: ignore-extra-package-files
+          path: path/to/folder
+        - name: overwrite-local-file
+          path: path/to/folder/file.txt
