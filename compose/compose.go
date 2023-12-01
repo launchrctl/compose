@@ -12,7 +12,6 @@ import (
 
 const (
 	composeFile = "compose.yaml"
-	composeLock = "compose.lock"
 	buildDir    = ".compose/build"
 )
 
@@ -22,7 +21,6 @@ var (
 
 // Composer stores compose definition
 type Composer struct {
-	fs      fs.FS
 	pwd     string
 	options *ComposerOptions
 	compose *YamlCompose
@@ -37,39 +35,23 @@ type ComposerOptions struct {
 }
 
 // CreateComposer instance
-func CreateComposer(fs fs.FS, pwd string, opts ComposerOptions, k keyring.Keyring) (*Composer, error) {
-	config, err := composeLookup(fs)
+func CreateComposer(pwd string, opts ComposerOptions, k keyring.Keyring) (*Composer, error) {
+	config, err := composeLookup(os.DirFS(pwd))
 	if err != nil {
 		return nil, errComposeNotExists
 	}
 
-	return &Composer{fs, pwd, &opts, config, k}, nil
+	return &Composer{pwd, &opts, config, k}, nil
 }
 
 // RunInstall on composr
 func (c *Composer) RunInstall() error {
-	lock, _ := lockLookup(c.getFS())
 	dm := CreateDownloadManager()
 
 	packagesDir := c.getPackagesDirPath()
-	buildDir := c.getBuildDirPath()
-
-	if lock != nil {
-		_, err := dm.DownloadViaLock(lock, packagesDir, c.getKeyring())
-		if err != nil {
-			return err
-		}
-	} else {
-		packages, err := dm.DownloadViaCompose(c.getCompose(), packagesDir, c.getKeyring())
-		if err != nil {
-			return err
-		}
-		lock = &YamlLock{Packages: packages}
-
-		err = lock.save(filepath.Join(c.pwd, composeLock))
-		if err != nil {
-			return err
-		}
+	packages, err := dm.Download(c.getCompose(), packagesDir, c.getKeyring())
+	if err != nil {
+		return err
 	}
 
 	// ensure all packages downloaded / warn user
@@ -77,11 +59,11 @@ func (c *Composer) RunInstall() error {
 
 	builder := createBuilder(
 		c.pwd,
-		buildDir,
+		c.getBuildDirPath(),
 		packagesDir,
 		c.options.SkipNotVersioned,
 		c.options.ConflictsVerbosity,
-		lock.Packages)
+		packages)
 	return builder.build()
 }
 
@@ -112,26 +94,8 @@ func composeLookup(fsys fs.FS) (*YamlCompose, error) {
 	return cfg, nil
 }
 
-func lockLookup(fsys fs.FS) (*YamlLock, error) {
-	f, err := fs.ReadFile(fsys, composeLock)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg, err := parseLockYaml(f)
-	if err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
-}
-
 func (c *Composer) getCompose() *YamlCompose {
 	return c.compose
-}
-
-func (c *Composer) getFS() fs.FS {
-	return c.fs
 }
 
 func (c *Composer) getKeyring() keyring.Keyring {

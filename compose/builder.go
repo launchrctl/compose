@@ -19,8 +19,8 @@ const (
 	gitPrefix      = ".git"
 )
 
-var excludedFolders = map[string]struct{}{".idea": {}, ".compose": {}}
-var excludedFiles = map[string]struct{}{composeFile: {}, composeLock: {}}
+var excludedFolders = map[string]struct{}{".compose": {}}
+var excludedFiles = map[string]struct{}{composeFile: {}}
 
 type mergeConflictResolve uint8
 type mergeStrategyType uint8

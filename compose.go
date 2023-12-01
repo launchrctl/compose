@@ -2,8 +2,6 @@
 package compose
 
 import (
-	"os"
-
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
 	"github.com/spf13/cobra"
@@ -45,7 +43,6 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
 			c, err := compose.CreateComposer(
-				os.DirFS(p.wd),
 				p.wd,
 				compose.ComposerOptions{
 					WorkingDir:         workingDir,
