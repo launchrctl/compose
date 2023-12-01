@@ -43,68 +43,6 @@ dependencies:
         path: path/to/remove-extra-local-files
 ```
 
-`Lock example`
-
-```yaml
-hash: c200cfea09886bf0b919c2067c231089e5f77ce5d5cceb119fcd1a4438d02a12
-packages:
-  - name: compose-dependency-example
-    source:
-      type: git
-      url: https://github.com/example/compose-dependency-example.git
-      ref: master
-      tag: 0.0.1
-  - name: compose-example-http
-    source:
-      type: http
-      url: https://github.com/example/compose-example-http/archive/refs/tags/0.0.1.tar.gz
-  - name: compose-example
-    source:
-      type: git
-      url: https://github.com/example/compose-example.git
-      ref: master
-      tag: 0.0.7
-      strategy:
-        - name: remove-extra-local-files
-          path: path/to/remove-extra-local-files
-    dependencies:
-      - compose-dependency-example
-      - compose-example-http
-```
-
-#### Merge strategies
-
-It's possible to specify the way directories and files copied during compose.
-
-By default, compose merges local and package files with local priority (mix-local-and-package-files).
-
-In case if you want to override local file, you need to use `overwrite-local-file` strategy.
-
-```
-      strategy:
-        - name: overwrite-local-file
-          path: path/to/overwrite-local-file/file.txt
-```
-
-To handle case when some files exist in local but not in package, or the opposite use:
-- strict copy of package (`remove-extra-local-files`)
-- partial copy of package (`ignore-extra-package-files`)
-
-Above strategies can work both with folders and files.
-
-```
-      strategy:
-        - name: remove-extra-local-files
-          path: path/to/folder
-        - name: ignore-extra-package-files
-          path: path/to/folder
-          
-      strategy:
-        - name: remove-extra-local-files
-          path: path/to/folder/filename.txt
-        - name: ignore-extra-package-files
-          path: path/to/folder/filename.txt
-```
 
 ### Fetching and Installing Dependencies
 The composition tool fetches and installs dependencies for a package by recursively processing the "compose.yaml" files for each package and its dependencies. The tool follows these general steps:
