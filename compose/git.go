@@ -32,7 +32,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, k keyring.Keyri
 	if pkg.GetRef() != "" {
 		options.ReferenceName = plumbing.NewBranchReferenceName(pkg.GetRef())
 	} else if pkg.GetTag() != "" {
-		options.ReferenceName = plumbing.NewTagReferenceName(pkg.GetRef())
+		options.ReferenceName = plumbing.NewTagReferenceName(pkg.GetTag())
 	}
 
 	ci, err := getPassword(k, url)
