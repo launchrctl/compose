@@ -270,7 +270,7 @@ func (b *Builder) build() error {
 		}
 
 		if !isSymlink {
-			if err := os.Chmod(destPath, treeItem.Entry.Mode()); err != nil {
+			if err := os.Chmod(destPath, dirPermissions); err != nil {
 				return err
 			}
 		}
