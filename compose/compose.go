@@ -17,7 +17,8 @@ const (
 )
 
 var (
-	errComposeNotExists = errors.New("compose.yaml doesn't exist")
+	errComposeNotExists    = errors.New("compose.yaml doesn't exist")
+	errComposeBadStructure = errors.New("incorrect mapping for compose.yaml, ensure structure is correct")
 )
 
 // Composer stores compose definition
@@ -39,7 +40,7 @@ type ComposerOptions struct {
 func CreateComposer(pwd string, opts ComposerOptions, k keyring.Keyring) (*Composer, error) {
 	config, err := composeLookup(os.DirFS(pwd))
 	if err != nil {
-		return nil, errComposeNotExists
+		return nil, err
 	}
 
 	return &Composer{pwd, &opts, config, k}, nil
@@ -84,12 +85,12 @@ func EnsureDirExists(path string) error {
 func composeLookup(fsys fs.FS) (*YamlCompose, error) {
 	f, err := fs.ReadFile(fsys, composeFile)
 	if err != nil {
-		return &YamlCompose{}, err
+		return &YamlCompose{}, errComposeNotExists
 	}
 
 	cfg, err := parseComposeYaml(f)
 	if err != nil {
-		return &YamlCompose{}, err
+		return &YamlCompose{}, errComposeBadStructure
 	}
 
 	return cfg, nil
