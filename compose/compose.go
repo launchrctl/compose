@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	composeFile    = "compose.yaml"
-	buildDir       = ".compose/build"
-	dirPermissions = 0755
+	composeFile     = "compose.yaml"
+	buildDir        = ".compose/build"
+	dirPermissions  = 0755
 )
 
 var (
