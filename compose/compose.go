@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	composeFile = "compose.yaml"
-	buildDir    = ".compose/build"
+	composeFile     = "compose.yaml"
+	buildDir        = ".compose/build"
+	dirPermissions  = 0755
 )
 
 var (
@@ -77,7 +78,7 @@ func (c *Composer) getPackagesDirPath() string {
 
 // EnsureDirExists checks if directory exists, otherwise create it
 func EnsureDirExists(path string) error {
-	return os.MkdirAll(path, os.ModePerm)
+	return os.MkdirAll(path, dirPermissions)
 }
 
 func composeLookup(fsys fs.FS) (*YamlCompose, error) {

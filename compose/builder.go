@@ -252,6 +252,7 @@ func (b *Builder) build() error {
 		sourcePath := filepath.Join(treeItem.Prefix, treeItem.Path)
 		destPath := filepath.Join(b.targetDir, treeItem.Path)
 		isSymlink := false
+		permissions := os.FileMode(dirPermissions)
 
 		switch treeItem.Entry.Mode() & os.ModeType {
 		case os.ModeDir:
@@ -264,13 +265,14 @@ func (b *Builder) build() error {
 			}
 			isSymlink = true
 		default:
+			permissions = treeItem.Entry.Mode()
 			if err := fcopy(sourcePath, destPath); err != nil {
 				return err
 			}
 		}
 
 		if !isSymlink {
-			if err := os.Chmod(destPath, treeItem.Entry.Mode()); err != nil {
+			if err := os.Chmod(destPath, permissions); err != nil {
 				return err
 			}
 		}
