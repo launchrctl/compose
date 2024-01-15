@@ -35,7 +35,7 @@ func newHTTP() Downloader {
 }
 
 // Download implements Downloader.Download interface
-func (h *httpDownloader) Download(pkg *Package, targetDir string, k keyring.Keyring) error {
+func (h *httpDownloader) Download(pkg *Package, targetDir string, ci keyring.CredentialsItem) error {
 	url := pkg.GetURL()
 	name := rgxNameFromURL.FindString(url)
 	if name == "" {
@@ -44,7 +44,11 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, k keyring.Keyr
 
 	fmt.Println(fmt.Sprintf("http download: " + name))
 	fpath := filepath.Clean(filepath.Join(targetDir, name))
-	os.MkdirAll(targetDir, dirPermissions)
+
+	err := os.MkdirAll(targetDir, dirPermissions)
+	if err != nil {
+		return err
+	}
 
 	out, err := os.Create(fpath)
 	if err != nil {
@@ -60,8 +64,7 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, k keyring.Keyr
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 
-	ci, err := getPassword(k, url)
-	if err == nil {
+	if ci != (keyring.CredentialsItem{}) {
 		req.SetBasicAuth(ci.Username, ci.Password)
 	}
 
