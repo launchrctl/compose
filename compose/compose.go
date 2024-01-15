@@ -77,17 +77,24 @@ func (c *Composer) RunInstall() error {
 
 func (c *Composer) prepareInstall() (string, string, error) {
 	buildPath := c.getPath(buildDir)
+	composePath := c.getPath(composeDir)
 	packagesPath := c.getPath(c.options.WorkingDir)
 
 	if c.options.Clean {
 		fmt.Printf("Cleaning compose dir: %s\n", composeDir)
-		err := os.RemoveAll(composeDir)
+		err := os.RemoveAll(composePath)
 		if err != nil {
 			return "", "", err
 		}
 
 		fmt.Printf("Cleaning packages dir: %s\n", c.options.WorkingDir)
 		err = os.RemoveAll(packagesPath)
+		if err != nil {
+			return "", "", err
+		}
+	} else {
+		fmt.Printf("Cleaning build dir: %s\n", buildDir)
+		err := os.RemoveAll(buildPath)
 		if err != nil {
 			return "", "", err
 		}
