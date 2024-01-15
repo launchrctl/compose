@@ -3,6 +3,7 @@ package compose
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -11,8 +12,9 @@ import (
 )
 
 const (
-	composeFile    = "compose.yaml"
 	buildDir       = ".compose/build"
+	composeDir     = ".compose"
+	composeFile    = "compose.yaml"
 	dirPermissions = 0755
 )
 
@@ -31,6 +33,7 @@ type Composer struct {
 
 // ComposerOptions - list of possible composer options
 type ComposerOptions struct {
+	Clean              bool
 	WorkingDir         string
 	SkipNotVersioned   bool
 	ConflictsVerbosity bool
@@ -48,9 +51,12 @@ func CreateComposer(pwd string, opts ComposerOptions, k keyring.Keyring) (*Compo
 
 // RunInstall on composr
 func (c *Composer) RunInstall() error {
-	dm := CreateDownloadManager()
+	buildDir, packagesDir, err := c.prepareInstall()
+	if err != nil {
+		return err
+	}
 
-	packagesDir := c.getPackagesDirPath()
+	dm := CreateDownloadManager()
 	packages, err := dm.Download(c.getCompose(), packagesDir, c.getKeyring())
 	if err != nil {
 		return err
@@ -61,7 +67,7 @@ func (c *Composer) RunInstall() error {
 
 	builder := createBuilder(
 		c.pwd,
-		c.getBuildDirPath(),
+		buildDir,
 		packagesDir,
 		c.options.SkipNotVersioned,
 		c.options.ConflictsVerbosity,
@@ -69,12 +75,29 @@ func (c *Composer) RunInstall() error {
 	return builder.build()
 }
 
-func (c *Composer) getBuildDirPath() string {
-	return filepath.Join(c.pwd, buildDir)
+func (c *Composer) prepareInstall() (string, string, error) {
+	buildPath := c.getPath(buildDir)
+	packagesPath := c.getPath(c.options.WorkingDir)
+
+	if c.options.Clean {
+		fmt.Printf("Cleaning compose dir: %s\n", composeDir)
+		err := os.RemoveAll(composeDir)
+		if err != nil {
+			return "", "", err
+		}
+
+		fmt.Printf("Cleaning packages dir: %s\n", c.options.WorkingDir)
+		err = os.RemoveAll(packagesPath)
+		if err != nil {
+			return "", "", err
+		}
+	}
+
+	return buildPath, packagesPath, nil
 }
 
-func (c *Composer) getPackagesDirPath() string {
-	return filepath.Join(c.pwd, c.options.WorkingDir)
+func (c *Composer) getPath(value string) string {
+	return filepath.Join(c.pwd, value)
 }
 
 // EnsureDirExists checks if directory exists, otherwise create it
