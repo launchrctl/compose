@@ -78,7 +78,7 @@ func (m DownloadManager) Download(c *YamlCompose, targetDir string) ([]*Package,
 				return packages, err
 			}
 		}
-		k.Save()
+		err = k.Save()
 	}
 
 	return packages, err

@@ -88,7 +88,7 @@ func (p *Package) GetTag() string {
 	return p.Source.Tag
 }
 
-// GetTarget returns version target of package
+// GetTarget returns a target version of package
 func (p *Package) GetTarget() string {
 	target := "latest"
 

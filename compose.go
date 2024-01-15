@@ -2,8 +2,12 @@
 package compose
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
+	"github.com/launchrctl/launchr/pkg/action"
 	"github.com/spf13/cobra"
 
 	"github.com/launchrctl/compose/compose"
@@ -28,6 +32,8 @@ func (p *Plugin) PluginInfo() launchr.PluginInfo {
 func (p *Plugin) OnAppInit(app launchr.App) error {
 	app.GetService(&p.k)
 	p.wd = app.GetWD()
+	buildDir := filepath.Join(p.wd, compose.BuildDir)
+	app.RegisterFS(action.NewDiscoveryFS(os.DirFS(buildDir), buildDir))
 	return nil
 }
 
