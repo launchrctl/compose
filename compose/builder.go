@@ -135,6 +135,7 @@ func getVersionedMap(gitDir string) (map[string]bool, error) {
 }
 
 func (b *Builder) build() error {
+	fmt.Println("Creating composition...")
 	err := EnsureDirExists(b.targetDir)
 	if err != nil {
 		return err
