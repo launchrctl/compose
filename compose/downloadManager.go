@@ -95,11 +95,17 @@ func (m DownloadManager) recursiveDownload(c *YamlCompose, packages []*Package, 
 
 func downloadPackage(pkg *Package, targetDir string, k keyring.Keyring) error {
 	downloader := getDownloaderForPackage(pkg.GetType())
-	var packagePath = filepath.Join(targetDir, pkg.GetName())
-	var downloadPath = packagePath
+	packagePath := filepath.Join(targetDir, pkg.GetName())
+	downloadPath := filepath.Join(packagePath, pkg.GetTarget())
+
+	if _, err := os.Stat(downloadPath); !os.IsNotExist(err) {
+		// Skip package download if folder exists in packages dir.
+		return nil
+	}
+
 	// temporary
 	if dtype := pkg.GetType(); dtype == httpType {
-		downloadPath = targetDir
+		downloadPath = packagePath
 	}
 
 	err := downloader.Download(pkg, downloadPath, k)

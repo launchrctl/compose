@@ -36,6 +36,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	var workingDir string
 	var skipNotVersioned bool
 	var conflictsVerbosity bool
+	var clean bool
 	var composeCmd = &cobra.Command{
 		Use:   "compose",
 		Short: "Composes filesystem (files & dirs)",
@@ -45,6 +46,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 			c, err := compose.CreateComposer(
 				p.wd,
 				compose.ComposerOptions{
+					Clean:              clean,
 					WorkingDir:         workingDir,
 					SkipNotVersioned:   skipNotVersioned,
 					ConflictsVerbosity: conflictsVerbosity,
@@ -62,6 +64,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	composeCmd.Flags().StringVarP(&workingDir, "working-dir", "w", ".compose/packages", "Working directory for temp files")
 	composeCmd.Flags().BoolVarP(&skipNotVersioned, "skip-not-versioned", "s", false, "Skip not versioned files from source directory (git only)")
 	composeCmd.Flags().BoolVar(&conflictsVerbosity, "conflicts-verbosity", false, "Log files conflicts")
+	composeCmd.Flags().BoolVar(&clean, "clean", false, "Remove .compose dir on start")
 	rootCmd.AddCommand(composeCmd)
 	return nil
 }

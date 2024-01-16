@@ -88,6 +88,18 @@ func (p *Package) GetTag() string {
 	return p.Source.Tag
 }
 
+func (p *Package) GetTarget() string {
+	target := "latest"
+
+	if p.GetRef() != "" {
+		target = p.GetRef()
+	} else if p.GetTag() != "" {
+		target = p.GetTag()
+	}
+
+	return target
+}
+
 func parseComposeYaml(input []byte) (*YamlCompose, error) {
 	cfg := YamlCompose{}
 	err := yaml.Unmarshal(input, &cfg)
