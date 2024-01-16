@@ -202,6 +202,7 @@ func (b *Builder) build() error {
 
 	graph := buildDependenciesGraph(b.packages)
 	items, _ := graph.TopSort(DependencyRoot)
+	targetsMap := getTargetsMap(b.packages)
 
 	if b.logConflicts {
 		fmt.Print("Conflicting files:\n")
@@ -210,7 +211,7 @@ func (b *Builder) build() error {
 	for i := 0; i < len(items); i++ {
 		pkgName := items[i]
 		if pkgName != DependencyRoot {
-			pkgPath := filepath.Join(b.sourceDir, pkgName)
+			pkgPath := filepath.Join(b.sourceDir, pkgName, targetsMap[pkgName])
 			packageFs := os.DirFS(pkgPath)
 			strategies, ok := ps[pkgName]
 			err = fs.WalkDir(packageFs, ".", func(path string, d fs.DirEntry, err error) error {
@@ -279,6 +280,15 @@ func (b *Builder) build() error {
 	}
 
 	return nil
+}
+
+func getTargetsMap(packages []*Package) map[string]string {
+	targets := make(map[string]string)
+	for _, p := range packages {
+		targets[p.GetName()] = p.GetTarget()
+	}
+
+	return targets
 }
 
 func logConflictResolve(resolveto mergeConflictResolve, path, pkgName string, entry *fsEntry) {

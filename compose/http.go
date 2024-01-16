@@ -44,6 +44,7 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, k keyring.Keyr
 
 	fmt.Println(fmt.Sprintf("http download: " + name))
 	fpath := filepath.Clean(filepath.Join(targetDir, name))
+	os.MkdirAll(targetDir, dirPermissions)
 
 	out, err := os.Create(fpath)
 	if err != nil {
@@ -102,7 +103,7 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, k keyring.Keyr
 		// rename root folder to package name
 		return os.Rename(
 			filepath.Join(targetDir, archiveRootDir),
-			filepath.Join(targetDir, pkg.Name),
+			filepath.Join(targetDir, pkg.GetTarget()),
 		)
 	}
 
