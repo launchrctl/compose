@@ -58,20 +58,33 @@ func getPassword(k keyring.Keyring, url string) (keyring.CredentialsItem, error)
 // Download packages using compose file
 func (m DownloadManager) Download(c *YamlCompose, targetDir string) ([]*Package, error) {
 	packages := []*Package{}
+	credentials := []keyring.CredentialsItem{}
 	err := EnsureDirExists(targetDir)
 	if err != nil {
 		return packages, err
 	}
 
-	packages, err = m.recursiveDownload(c, packages, nil, targetDir)
+	packages, err = m.recursiveDownload(c, &credentials, packages, nil, targetDir)
 	if err != nil {
 		return packages, err
 	}
 
-	return packages, m.getKeyring().Save()
+	// store keyring credentials
+	if len(credentials) > 0 {
+		k := m.getKeyring()
+		for _, ci := range credentials {
+			err = k.AddItem(ci)
+			if err != nil {
+				return packages, err
+			}
+		}
+		k.Save()
+	}
+
+	return packages, err
 }
 
-func (m DownloadManager) recursiveDownload(c *YamlCompose, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
+func (m DownloadManager) recursiveDownload(c *YamlCompose, credentials *[]keyring.CredentialsItem, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
 	for _, d := range c.Dependencies {
 		// build package from dependency struct
 		// add depedency if parent exists
@@ -85,28 +98,33 @@ func (m DownloadManager) recursiveDownload(c *YamlCompose, packages []*Package, 
 			return packages, errNoURL
 		}
 
-		// @TODO check if package require auth for download
-		ci, err := getPassword(m.getKeyring(), url)
-		if err != nil {
-			ci.URL = url
-			ci, err = m.fillCreds(ci)
+		packagePath := filepath.Join(targetDir, pkg.GetName(), pkg.GetTarget())
+
+		// Skip package download if it exists in packages dir.
+		if _, err := os.Stat(packagePath); os.IsNotExist(err) {
+			// @TODO check if package require auth for download
+			ci, err := getPassword(m.getKeyring(), url)
+			if err != nil {
+				ci.URL = url
+				ci, err = m.fillCreds(ci)
+				if err != nil {
+					return packages, err
+				}
+
+				*credentials = append(*credentials, ci)
+			}
+
+			err = downloadPackage(pkg, targetDir, ci)
 			if err != nil {
 				return packages, err
 			}
 		}
 
-		err = downloadPackage(pkg, targetDir, ci)
-		if err != nil {
-			return packages, err
-		}
-
-		var packagePath = filepath.Join(targetDir, d.Name)
-
 		// If package has compose.yaml, proceed with it
 		if _, err := os.Stat(filepath.Join(packagePath, composeFile)); !os.IsNotExist(err) {
 			cfg, err := composeLookup(os.DirFS(packagePath))
 			if err == nil {
-				packages, err = m.recursiveDownload(cfg, packages, pkg, targetDir)
+				packages, err = m.recursiveDownload(cfg, credentials, packages, pkg, targetDir)
 				if err != nil {
 					return packages, err
 				}
@@ -120,17 +138,10 @@ func (m DownloadManager) recursiveDownload(c *YamlCompose, packages []*Package, 
 }
 
 func (m DownloadManager) fillCreds(ci keyring.CredentialsItem) (keyring.CredentialsItem, error) {
-	k := m.getKeyring()
-
 	if ci.URL != "" {
-		fmt.Printf("Please add login and passwod for URL - %s\n", ci.URL)
+		fmt.Printf("Please add login and password for URL - %s\n", ci.URL)
 	}
 	err := keyring.RequestCredentialsFromTty(&ci)
-	if err != nil {
-		return ci, err
-	}
-
-	err = k.AddItem(ci)
 	if err != nil {
 		return ci, err
 	}
