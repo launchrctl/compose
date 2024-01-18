@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	buildDir       = ".compose/build"
-	composeDir     = ".compose"
+	MainDir        = ".compose"         // MainDir is a compose directory.
+	BuildDir       = MainDir + "/build" // BuildDir is a result directory of compose action.
 	composeFile    = "compose.yaml"
 	dirPermissions = 0755
 )
@@ -71,17 +71,18 @@ func (c *Composer) RunInstall() error {
 		packagesDir,
 		c.options.SkipNotVersioned,
 		c.options.ConflictsVerbosity,
-		packages)
+		packages,
+	)
 	return builder.build()
 }
 
 func (c *Composer) prepareInstall() (string, string, error) {
-	buildPath := c.getPath(buildDir)
-	composePath := c.getPath(composeDir)
+	buildPath := c.getPath(BuildDir)
+	composePath := c.getPath(MainDir)
 	packagesPath := c.getPath(c.options.WorkingDir)
 
 	if c.options.Clean {
-		fmt.Printf("Cleaning compose dir: %s\n", composeDir)
+		fmt.Printf("Cleaning compose dir: %s\n", MainDir)
 		err := os.RemoveAll(composePath)
 		if err != nil {
 			return "", "", err
@@ -93,7 +94,7 @@ func (c *Composer) prepareInstall() (string, string, error) {
 			return "", "", err
 		}
 	} else {
-		fmt.Printf("Cleaning build dir: %s\n", buildDir)
+		fmt.Printf("Cleaning build dir: %s\n", BuildDir)
 		err := os.RemoveAll(buildPath)
 		if err != nil {
 			return "", "", err
