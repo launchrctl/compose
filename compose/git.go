@@ -17,7 +17,7 @@ func newGit() Downloader {
 }
 
 // Download implements Downloader.Download interface
-func (g *gitDownloader) Download(pkg *Package, targetDir string, k keyring.Keyring) error {
+func (g *gitDownloader) Download(pkg *Package, targetDir string, ci keyring.CredentialsItem) error {
 	fmt.Println(fmt.Sprintf("git fetch: " + pkg.GetURL()))
 
 	url := pkg.GetURL()
@@ -36,14 +36,13 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, k keyring.Keyri
 		options.ReferenceName = plumbing.NewTagReferenceName(pkg.GetTag())
 	}
 
-	ci, err := getPassword(k, url)
-	if err == nil {
+	if ci != (keyring.CredentialsItem{}) {
 		options.Auth = &http.BasicAuth{
 			Username: ci.Username,
 			Password: ci.Password,
 		}
 	}
 
-	_, err = git.PlainClone(targetDir, false, options)
+	_, err := git.PlainClone(targetDir, false, options)
 	return err
 }

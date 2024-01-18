@@ -56,8 +56,8 @@ func (c *Composer) RunInstall() error {
 		return err
 	}
 
-	dm := CreateDownloadManager()
-	packages, err := dm.Download(c.getCompose(), packagesDir, c.getKeyring())
+	dm := CreateDownloadManager(c.getKeyring())
+	packages, err := dm.Download(c.getCompose(), packagesDir)
 	if err != nil {
 		return err
 	}
