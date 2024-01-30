@@ -33,7 +33,7 @@ func (p *Plugin) OnAppInit(app launchr.App) error {
 	app.GetService(&p.k)
 	p.wd = app.GetWD()
 	buildDir := filepath.Join(p.wd, compose.BuildDir)
-	app.RegisterFS(action.NewDiscoveryFS(os.DirFS(buildDir), buildDir))
+	app.RegisterFS(action.NewDiscoveryFS(os.DirFS(buildDir), p.wd))
 	return nil
 }
 
