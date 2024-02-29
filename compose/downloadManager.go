@@ -1,9 +1,12 @@
 package compose
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/launchrctl/launchr/pkg/log"
 
 	"github.com/launchrctl/keyring"
 )
@@ -45,14 +48,6 @@ func getDownloaderForPackage(downloadType string) Downloader {
 
 func (m DownloadManager) ensurePackagesExist() {
 
-}
-
-func getPassword(k keyring.Keyring, url string) (keyring.CredentialsItem, error) {
-	creds, err := k.GetForURL(url)
-	if err != nil {
-		return keyring.CredentialsItem{}, err
-	}
-	return creds, nil
 }
 
 // Download packages using compose file
@@ -103,8 +98,16 @@ func (m DownloadManager) recursiveDownload(c *YamlCompose, credentials *[]keyrin
 		// Skip package download if it exists in packages dir.
 		if _, err := os.Stat(packagePath); os.IsNotExist(err) {
 			// @TODO check if package require auth for download
-			ci, err := getPassword(m.getKeyring(), url)
-			if err != nil {
+			k := m.getKeyring()
+			ci, errGet := k.GetForURL(url)
+			if errGet != nil {
+				if errors.Is(err, keyring.ErrEmptyPass) {
+					return packages, err
+				} else if !errors.Is(err, keyring.ErrNotFound) {
+					log.Debug("%s", err)
+					return packages, errors.New("the keyring is malformed or wrong passphrase provided")
+				}
+
 				ci.URL = url
 				ci, err = m.fillCreds(ci)
 				if err != nil {
