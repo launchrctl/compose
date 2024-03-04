@@ -82,7 +82,7 @@ func (m DownloadManager) Download(c *YamlCompose, targetDir string) ([]*Package,
 func (m DownloadManager) recursiveDownload(c *YamlCompose, credentials *[]keyring.CredentialsItem, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
 	for _, d := range c.Dependencies {
 		// build package from dependency struct
-		// add depedency if parent exists
+		// add dependency if parent exists
 		pkg := d.ToPackage(d.Name)
 		if parent != nil {
 			parent.AddDependency(d.Name)
@@ -101,10 +101,10 @@ func (m DownloadManager) recursiveDownload(c *YamlCompose, credentials *[]keyrin
 			k := m.getKeyring()
 			ci, errGet := k.GetForURL(url)
 			if errGet != nil {
-				if errors.Is(err, keyring.ErrEmptyPass) {
-					return packages, err
-				} else if !errors.Is(err, keyring.ErrNotFound) {
-					log.Debug("%s", err)
+				if errors.Is(errGet, keyring.ErrEmptyPass) {
+					return packages, errGet
+				} else if !errors.Is(errGet, keyring.ErrNotFound) {
+					log.Debug("%s", errGet)
 					return packages, errors.New("the keyring is malformed or wrong passphrase provided")
 				}
 
