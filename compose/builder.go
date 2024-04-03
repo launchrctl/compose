@@ -36,6 +36,7 @@ const (
 	overwriteLocalFile      mergeStrategyType    = 1
 	removeExtraLocalFiles   mergeStrategyType    = 2
 	ignoreExtraPackageFiles mergeStrategyType    = 3
+	filterPackageFiles      mergeStrategyType    = 4
 	noConflict              mergeConflictResolve = iota
 	resolveToLocal          mergeConflictResolve = 1
 	resolveToPackage        mergeConflictResolve = 2
@@ -81,6 +82,8 @@ func identifyStrategy(name string) (mergeStrategyType, mergeStrategyTarget) {
 		t = localStrategy
 	case "ignore-extra-package-files":
 		s = ignoreExtraPackageFiles
+	case "filter-package-files":
+		s = filterPackageFiles
 	}
 
 	return s, t
@@ -318,12 +321,13 @@ func addStrategyEntries(strategies []*mergeStrategy, entriesTree []*fsEntry, ent
 
 	// Apply strategies package strategies
 	for _, ms := range strategies {
-		if !strings.HasPrefix(path, ms.p) {
-			continue
-		}
-
 		switch ms.s {
 		case overwriteLocalFile:
+			// Skip strategy if filepath does not match strategy path
+			if !strings.HasPrefix(path, ms.p) {
+				continue
+			}
+
 			if localMapEntry, ok := entriesMap[path]; !ok {
 				entriesTree = append(entriesTree, entry)
 				entriesMap[path] = entry
@@ -335,7 +339,17 @@ func addStrategyEntries(strategies []*mergeStrategy, entriesTree []*fsEntry, ent
 				// Strategy replaces local path by package one.
 				conflictReslv = resolveToPackage
 			}
+		case filterPackageFiles:
+			if _, ok := entriesMap[path]; !ok && (strings.HasPrefix(path, ms.p) || (entry.Entry.IsDir() && strings.Contains(ms.p, path))) {
+				entriesTree = append(entriesTree, entry)
+				entriesMap[path] = entry
+			}
+
 		case ignoreExtraPackageFiles:
+			// Skip strategy if filepath does not match strategy path
+			if !strings.HasPrefix(path, ms.p) {
+				continue
+			}
 			// just do nothing and skip
 		}
 
