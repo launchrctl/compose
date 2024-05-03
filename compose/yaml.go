@@ -25,10 +25,10 @@ type Dependency struct {
 	Source Source `yaml:"source,omitempty"`
 }
 
-// Strategy stores packages merge strategy name and path
+// Strategy stores packages merge strategy name and paths
 type Strategy struct {
-	Name string `yaml:"name"`
-	Path string `yaml:"path"`
+	Name  string   `yaml:"name"`
+	Paths []string `yaml:"path"`
 }
 
 // Source stores package source definition

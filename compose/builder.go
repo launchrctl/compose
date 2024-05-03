@@ -26,9 +26,9 @@ type mergeConflictResolve uint8
 type mergeStrategyType uint8
 type mergeStrategyTarget uint8
 type mergeStrategy struct {
-	s mergeStrategyType
-	t mergeStrategyTarget
-	p string
+	s     mergeStrategyType
+	t     mergeStrategyTarget
+	paths []string
 }
 
 const (
@@ -56,7 +56,7 @@ func retrieveStrategies(packages []*Package) ([]*mergeStrategy, map[string][]*me
 			if s == undefinedStrategy {
 				continue
 			}
-			strategy := &mergeStrategy{s, t, item.Path}
+			strategy := &mergeStrategy{s, t, item.Paths}
 
 			if t == localStrategy {
 				ls = append(ls, strategy)
@@ -180,13 +180,13 @@ func (b *Builder) build() error {
 		// Apply strategies that target local files
 		for _, localStrategy := range ls {
 			if localStrategy.s == removeExtraLocalFiles {
-				if strings.HasPrefix(path, localStrategy.p) {
+				if ensureStrategyPrefixPath(path, localStrategy.paths) {
 					return nil
 				}
 			}
 		}
 
-		// Add .git folder into entriesTree whenever checkversioned or not
+		// Add .git folder into entriesTree whenever CheckVersioned or not
 		if checkVersioned && !strings.HasPrefix(path, gitPrefix) {
 			if _, ok := versionedMap[path]; !ok {
 				return nil
@@ -304,59 +304,79 @@ func logConflictResolve(resolveto mergeConflictResolve, path, pkgName string, en
 }
 
 func addEntries(entriesTree []*fsEntry, entriesMap map[string]*fsEntry, entry *fsEntry, path string) ([]*fsEntry, mergeConflictResolve) {
-	conflictReslv := noConflict
+	conflictResolve := noConflict
 	if _, ok := entriesMap[path]; !ok {
 		entriesTree = append(entriesTree, entry)
 		entriesMap[path] = entry
 	} else {
 		// Be default all conflicts auto-resolved to local.
-		conflictReslv = resolveToLocal
+		conflictResolve = resolveToLocal
 	}
 
-	return entriesTree, conflictReslv
+	return entriesTree, conflictResolve
 }
 
 func addStrategyEntries(strategies []*mergeStrategy, entriesTree []*fsEntry, entriesMap map[string]*fsEntry, entry *fsEntry, path string) ([]*fsEntry, mergeConflictResolve) {
-	conflictReslv := noConflict
+	conflictResolve := noConflict
 
 	// Apply strategies package strategies
 	for _, ms := range strategies {
 		switch ms.s {
 		case overwriteLocalFile:
-			// Skip strategy if filepath does not match strategy path
-			if !strings.HasPrefix(path, ms.p) {
+			// Skip strategy if filepath does not match strategy paths
+			if !ensureStrategyPrefixPath(path, ms.paths) {
 				continue
 			}
 
 			if localMapEntry, ok := entriesMap[path]; !ok {
 				entriesTree = append(entriesTree, entry)
 				entriesMap[path] = entry
-			} else if strings.HasPrefix(path, ms.p) {
+			} else if ensureStrategyPrefixPath(path, ms.paths) {
 				localMapEntry.Prefix = entry.Prefix
 				localMapEntry.Entry = entry.Entry
 				localMapEntry.From = entry.From
 
-				// Strategy replaces local path by package one.
-				conflictReslv = resolveToPackage
+				// Strategy replaces local paths by package one.
+				conflictResolve = resolveToPackage
 			}
 		case filterPackageFiles:
-			if _, ok := entriesMap[path]; !ok && (strings.HasPrefix(path, ms.p) || (entry.Entry.IsDir() && strings.Contains(ms.p, path))) {
+			if _, ok := entriesMap[path]; !ok && (ensureStrategyPrefixPath(path, ms.paths) || (entry.Entry.IsDir() && ensureStrategyContainsPath(path, ms.paths))) {
 				entriesTree = append(entriesTree, entry)
 				entriesMap[path] = entry
 			}
 
 		case ignoreExtraPackageFiles:
-			// Skip strategy if filepath does not match strategy path
-			if !strings.HasPrefix(path, ms.p) {
+			// Skip strategy if filepath does not match strategy paths
+			if !ensureStrategyPrefixPath(path, ms.paths) {
 				continue
 			}
 			// just do nothing and skip
 		}
 
-		return entriesTree, conflictReslv
+		return entriesTree, conflictResolve
 	}
 
 	return addEntries(entriesTree, entriesMap, entry, path)
+}
+
+func ensureStrategyPrefixPath(path string, strategyPaths []string) bool {
+	for _, sp := range strategyPaths {
+		if strings.HasPrefix(path, sp) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func ensureStrategyContainsPath(path string, strategyPaths []string) bool {
+	for _, sp := range strategyPaths {
+		if strings.Contains(sp, path) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func buildDependenciesGraph(packages []*Package) *topsort.Graph {
