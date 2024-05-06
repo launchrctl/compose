@@ -20,13 +20,16 @@ dependencies:
           path: interaction/file-present-in-package-and-domain   < File from package will override file from domain
 
         - name: remove-extra-local-files
-          path: interaction/extra-local-file.txt < File from domain will be excluded if it does not exists in package
-          path: interaction/extra-local-folder < Directory from domain will be excluded if it does not exists in package
+          path: 
+            - interaction/extra-local-file.txt < File from domain will be excluded if it does not exists in package
+            - interaction/extra-local-folder < Directory from domain will be excluded if it does not exists in package
 
         - name: ignore-extra-package-files
-          path: interaction/extra-package-file.txt < File from package will be excluded if it does not exists in domain
-          path: interaction/extra-package-folder < Directory from package will be excluded if it does not exists in domain
+          path:
+            - interaction/extra-package-file.txt < File from package will be excluded if it does not exists in domain
+            - interaction/extra-package-folder < Directory from package will be excluded if it does not exists in domain
 
         - name: filter-package-files
-          path: interaction/filtered-package-file.txt < Only this file will be taken from package if it does not exists in domain
-          path: interaction/filtered-package-folder < Only this directory will be taken from package if it does not exists in domain
+          path:
+            - interaction/filtered-package-file.txt < Only this file will be taken from package if it does not exists in domain
+            - interaction/filtered-package-folder < Only this directory will be taken from package if it does not exists in domain
