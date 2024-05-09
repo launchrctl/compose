@@ -1,10 +1,10 @@
 ## Composition Tool Specification
 The composition tool is a command-line tool that helps developers manage
 dependencies for their projects. It allows developers to specify the dependencies for
-a project in a "compose.yaml" file, and then fetches and installs those dependencies
+a project in a "plasma-compose.yaml" file, and then fetches and installs those dependencies
 in a structured and organized way.
 
-The tool works by recursively fetching and processing the "compose.yaml" files for each package
+The tool works by recursively fetching and processing the "plasma-compose.yaml" files for each package
 and its dependencies, and then merging the resulting filesystems into a single filesystem.
 
 ### CLI
@@ -18,8 +18,8 @@ Where options are:
 
 example usage - `launchr compose -w=./folder/something -s=1 or -s=true --conflicts-verbosity`
 
-### `compose.yaml` File Format
-The "compose.yaml" file is a text file that specifies the dependencies for a package, along with any necessary metadata and sources for those dependencies.
+### `plasma-compose.yaml` File Format
+The "plasma-compose.yaml" file is a text file that specifies the dependencies for a package, along with any necessary metadata and sources for those dependencies.
 The file format includes the following elements:
 - name: The name of the package.
 - version: The version number of the package.
@@ -45,11 +45,11 @@ dependencies:
 
 
 ### Fetching and Installing Dependencies
-The composition tool fetches and installs dependencies for a package by recursively processing the "compose.yaml" files for each package and its dependencies. The tool follows these general steps:
+The composition tool fetches and installs dependencies for a package by recursively processing the "plasma-compose.yaml" files for each package and its dependencies. The tool follows these general steps:
 
 1. Fetch the package source code from the specified source location.
 2. Extract the package contents to a temporary directory.
-3. Process the "compose.yaml" file for the package, fetching and installing any necessary dependencies recursively.
+3. Process the "plasma-compose.yaml" file for the package, fetching and installing any necessary dependencies recursively.
 4. Merge the package filesystem into the final platform filesystem.
 5. Repeat steps 1-4 for each package and its dependencies.
 
