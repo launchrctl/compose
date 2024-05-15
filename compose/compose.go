@@ -14,13 +14,13 @@ import (
 const (
 	MainDir        = ".compose"         // MainDir is a compose directory.
 	BuildDir       = MainDir + "/build" // BuildDir is a result directory of compose action.
-	composeFile    = "compose.yaml"
+	composeFile    = "plasma-compose.yaml"
 	dirPermissions = 0755
 )
 
 var (
-	errComposeNotExists    = errors.New("compose.yaml doesn't exist")
-	errComposeBadStructure = errors.New("incorrect mapping for compose.yaml, ensure structure is correct")
+	errComposeNotExists    = errors.New("plasma-compose.yaml doesn't exist")
+	errComposeBadStructure = errors.New("incorrect mapping for plasma-compose.yaml, ensure structure is correct")
 )
 
 // Composer stores compose definition
