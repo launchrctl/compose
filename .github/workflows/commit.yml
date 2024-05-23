@@ -24,7 +24,7 @@ jobs:
           ./bin/launchr login --url=http://***.git --username="***" --password="***" --keyring-passphrase="***"
 
   command-ok:
-    name: Ensure main command brought by plugin does not fail
+    name: Ensure main command does not fail
     runs-on: ubuntu-latest
     env:
       EXAMPLE_REPO_USERNAME: ${{ secrets.EXAMPLE_REPO_USERNAME }}
@@ -57,6 +57,8 @@ jobs:
           echo "$EXAMPLE_REPO_PASSWORD"
           echo "$KEYRING_PASSWORD"
           ./bin/launchr login --url=https://github.com/davidferlay/compose-example.git  --username="${EXAMPLE_REPO_USERNAME}" --password="${EXAMPLE_REPO_PASSWORD}" --keyring-passphrase="${KEYRING_PASSWORD}"
+          ./bin/launchr compose --keyring-passphrase "${PLASMACTL_KEYRING_PASSWORD}" --skip-not-versioned --conflicts-verbosity --clean
+          ls -lah .compose/build
 
   go-linters:
     name: Run linters
