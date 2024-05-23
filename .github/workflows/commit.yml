@@ -1,4 +1,5 @@
-name: Ensure no TTY if user does not need to input anything
+name: Commit Workflow
+
 on:
   push:
   workflow_dispatch:
