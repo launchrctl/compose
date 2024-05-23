@@ -1,0 +1,9 @@
+name: launchr
+dependencies:
+  - name: example
+    source:
+      type: git
+      ref: main
+      url: https://github.com/davidferlay/compose-example.git
+      strategy: null
+

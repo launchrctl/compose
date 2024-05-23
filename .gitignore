@@ -4,3 +4,5 @@
 *.tar
 *.gz
 *.gen.go
+.launchr/
+.compose/

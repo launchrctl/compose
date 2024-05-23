@@ -1,0 +1,92 @@
+name: Commit Workflow
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  no-tty-in-ci:
+    name: Ensure no TTY if user does not need to input anything
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Commands
+        run: |
+          set -x
+          date
+          pwd
+          whoami
+          make deps build
+          ls -lah bin/launchr
+          ./bin/launchr login --url=http://***.git --username="***" --password="***" --keyring-passphrase="***"
+
+  commands-ok:
+    name: Ensure main commands do not fail
+    runs-on: ubuntu-latest
+    env:
+      EXAMPLE_REPO_USERNAME: ${{ secrets.EXAMPLE_REPO_USERNAME }}
+      EXAMPLE_REPO_PASSWORD: ${{ secrets.EXAMPLE_REPO_PASSWORD }}
+      KEYRING_PASSWORD: ${{ secrets.KEYRING_PASSWORD }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Commands # TODO: Add another test with a public repo
+        run: |
+          set -x
+          date
+          pwd
+          whoami
+          make deps build
+          ls -lah bin/launchr
+          cat <<EOF > plasma-compose.yaml
+          name: launchr
+          dependencies:
+            - name: example
+              source:
+                type: git
+                ref: main
+                url: https://github.com/davidferlay/compose-example.git
+                strategy: null
+          EOF
+          cat plasma-compose.yaml
+          ./bin/launchr login --url=https://github.com/davidferlay/compose-example.git --username="${EXAMPLE_REPO_USERNAME}" --password="${EXAMPLE_REPO_PASSWORD}" --keyring-passphrase="${KEYRING_PASSWORD}"
+          ./bin/launchr compose --keyring-passphrase "${KEYRING_PASSWORD}" --skip-not-versioned --conflicts-verbosity --clean
+          ls -lah .compose/build
+
+  go-linters:
+    name: Run linters
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Commands
+        run: |
+          set -x
+          date
+          pwd
+          whoami
+          make lint
+
+  go-tests:
+    name: Run Go tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Commands
+        run: |
+          set -x
+          date
+          pwd
+          whoami
+          make test
+
