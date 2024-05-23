@@ -23,8 +23,8 @@ jobs:
           ls -lah bin/launchr
           ./bin/launchr login --url=http://***.git --username="***" --password="***" --keyring-passphrase="***"
 
-  command-ok:
-    name: Ensure main command does not fail
+  commands-ok:
+    name: Ensure main commands do not fail
     runs-on: ubuntu-latest
     env:
       EXAMPLE_REPO_USERNAME: ${{ secrets.EXAMPLE_REPO_USERNAME }}
@@ -35,7 +35,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Commands
+      - name: Commands # TODO: Add another test with a public repo
         run: |
           echo
           date
