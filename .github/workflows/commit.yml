@@ -53,11 +53,12 @@ jobs:
                 url: https://github.com/davidferlay/compose-example.git
                 strategy: null
           EOF
-          echo "$EXAMPLE_REPO_USERNAME"
-          echo "$EXAMPLE_REPO_PASSWORD"
-          echo "$KEYRING_PASSWORD"
-          ./bin/launchr login --url=https://github.com/davidferlay/compose-example.git  --username="${EXAMPLE_REPO_USERNAME}" --password="${EXAMPLE_REPO_PASSWORD}" --keyring-passphrase="${KEYRING_PASSWORD}"
-          ./bin/launchr compose --keyring-passphrase "${PLASMACTL_KEYRING_PASSWORD}" --skip-not-versioned --conflicts-verbosity --clean
+          cat plasma-compose.yaml
+          echo "${EXAMPLE_REPO_USERNAME}"
+          echo "${EXAMPLE_REPO_PASSWORD}"
+          echo "${KEYRING_PASSWORD}"
+          ./bin/launchr login --url=https://github.com/davidferlay/compose-example.git --username="${EXAMPLE_REPO_USERNAME}" --password="${EXAMPLE_REPO_PASSWORD}" --keyring-passphrase="${KEYRING_PASSWORD}"
+          ./bin/launchr compose --keyring-passphrase "${KEYRING_PASSWORD}" --skip-not-versioned --conflicts-verbosity --clean
           ls -lah .compose/build
 
   go-linters:
