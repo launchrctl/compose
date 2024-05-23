@@ -1,0 +1,56 @@
+name: Ensure no TTY if user does not need to input anything
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  ensure-no-tty:
+    name: Ensure no TTY if user does not need to input anything
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Commands
+        run: |
+          echo
+          date
+          pwd
+          whoami
+          make deps build
+          ls -lah bin/launchr
+          ./bin/launchr login --url=http://***.git --username="***" --password="***" --keyring-passphrase="***"
+
+  go-linters:
+    name: Run linters
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Commands
+        run: |
+          echo
+          date
+          pwd
+          whoami
+          make lint
+
+  go-tests:
+    name: Run Go tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Commands
+        run: |
+          echo
+          date
+          pwd
+          whoami
+          make test
+
