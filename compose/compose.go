@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/launchrctl/launchr/pkg/log"
+
 	"github.com/launchrctl/keyring"
 )
 
@@ -37,6 +39,7 @@ type ComposerOptions struct {
 	WorkingDir         string
 	SkipNotVersioned   bool
 	ConflictsVerbosity bool
+	Interactive        bool
 }
 
 // CreateComposer instance
@@ -49,21 +52,69 @@ func CreateComposer(pwd string, opts ComposerOptions, k keyring.Keyring) (*Compo
 	return &Composer{pwd, &opts, config, k}, nil
 }
 
-// RunInstall on composr
+type keyringWrapper struct {
+	keyringService keyring.Keyring
+	interactive    bool
+	shouldUpdate   bool
+}
+
+func (kw *keyringWrapper) getForURL(url string) (keyring.CredentialsItem, error) {
+	ci, errGet := kw.keyringService.GetForURL(url)
+	if errGet != nil {
+		if errors.Is(errGet, keyring.ErrEmptyPass) {
+			return ci, errGet
+		} else if !errors.Is(errGet, keyring.ErrNotFound) {
+			log.Debug("%s", errGet)
+			return ci, errors.New("the keyring is malformed or wrong passphrase provided")
+		}
+
+		if !kw.interactive {
+			return ci, errGet
+		}
+
+		ci.URL = url
+		newCI, err := kw.fillCredentials(ci)
+		if err != nil {
+			return ci, err
+		}
+
+		err = kw.keyringService.AddItem(newCI)
+		if err != nil {
+			return ci, err
+		}
+
+		ci = newCI
+		kw.shouldUpdate = true
+	}
+
+	return ci, nil
+}
+
+func (kw *keyringWrapper) fillCredentials(ci keyring.CredentialsItem) (keyring.CredentialsItem, error) {
+	if ci.URL != "" {
+		fmt.Printf("Please add login and password for URL - %s\n", ci.URL)
+	}
+	err := keyring.RequestCredentialsFromTty(&ci)
+	if err != nil {
+		return ci, err
+	}
+
+	return ci, nil
+}
+
+// RunInstall on Composer
 func (c *Composer) RunInstall() error {
 	buildDir, packagesDir, err := c.prepareInstall()
 	if err != nil {
 		return err
 	}
 
-	dm := CreateDownloadManager(c.getKeyring())
+	kw := &keyringWrapper{keyringService: c.getKeyring(), shouldUpdate: false, interactive: c.options.Interactive}
+	dm := CreateDownloadManager(kw)
 	packages, err := dm.Download(c.getCompose(), packagesDir)
 	if err != nil {
 		return err
 	}
-
-	// ensure all packages downloaded / warn user
-	dm.ensurePackagesExist()
 
 	builder := createBuilder(
 		c.pwd,

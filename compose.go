@@ -43,12 +43,15 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	var skipNotVersioned bool
 	var conflictsVerbosity bool
 	var clean bool
+	var interactive bool
+
 	var composeCmd = &cobra.Command{
 		Use:   "compose",
 		Short: "Composes filesystem (files & dirs)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
+
 			c, err := compose.CreateComposer(
 				p.wd,
 				compose.ComposerOptions{
@@ -56,6 +59,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 					WorkingDir:         workingDir,
 					SkipNotVersioned:   skipNotVersioned,
 					ConflictsVerbosity: conflictsVerbosity,
+					Interactive:        interactive,
 				},
 				p.k,
 			)
@@ -71,6 +75,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	composeCmd.Flags().BoolVarP(&skipNotVersioned, "skip-not-versioned", "s", false, "Skip not versioned files from source directory (git only)")
 	composeCmd.Flags().BoolVar(&conflictsVerbosity, "conflicts-verbosity", false, "Log files conflicts")
 	composeCmd.Flags().BoolVar(&clean, "clean", false, "Remove .compose dir on start")
+	composeCmd.Flags().BoolVar(&interactive, "interactive", true, "Interactive mode allows to submit user credentials during action")
 	rootCmd.AddCommand(composeCmd)
 	return nil
 }
