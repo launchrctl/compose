@@ -14,12 +14,18 @@ import (
 	"strings"
 
 	"github.com/launchrctl/keyring"
+	"github.com/launchrctl/launchr/pkg/cli"
+	"github.com/launchrctl/launchr/pkg/log"
 )
 
 var (
-	errInvalidaFilepath = errors.New("invalid filepath")
-	errNoURL            = errors.New("invalid url")
-	errFailedClose      = errors.New("failed to close stream")
+	errInvalidaFilepath       = errors.New("invalid filepath")
+	errNoURL                  = errors.New("invalid url")
+	errFailedClose            = errors.New("failed to close stream")
+	errRepositoryNotFound     = errors.New("repository not found")
+	errAuthenticationRequired = errors.New("authentication required")
+	errAuthorizationFailed    = errors.New("authorization failed")
+	errHTTPUnknown            = errors.New("unhandled error")
 )
 
 var (
@@ -35,7 +41,7 @@ func newHTTP() Downloader {
 }
 
 // Download implements Downloader.Download interface
-func (h *httpDownloader) Download(pkg *Package, targetDir string, ci keyring.CredentialsItem) error {
+func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWrapper) error {
 	url := pkg.GetURL()
 	name := rgxNameFromURL.FindString(url)
 	if name == "" {
@@ -62,15 +68,68 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, ci keyring.Cre
 	}()
 
 	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	var resp *http.Response
 
-	if ci != (keyring.CredentialsItem{}) {
-		req.SetBasicAuth(ci.Username, ci.Password)
-	}
+	errDownloadFailed := fmt.Errorf("failed to download package: %s", name)
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
+	auths := []authorizationMode{authorisationNone, authorisationKeyring, authorisationManual}
+	for _, authType := range auths {
+		req, errReq := http.NewRequest(http.MethodGet, url, nil)
+		if errReq != nil {
+			return errReq
+		}
+
+		if authType == authorisationNone {
+			resp, err = doRequest(client, req)
+			if err != nil {
+				if errors.Is(err, errAuthenticationRequired) {
+					cli.Println("auth required, trying keyring authorisation")
+					continue
+				}
+
+				log.Debug(err.Error())
+				return errDownloadFailed
+			}
+		}
+
+		if authType == authorisationKeyring {
+			ci, errGet := kw.getForURL(url)
+			if errGet != nil {
+				return errGet
+			}
+
+			req.SetBasicAuth(ci.Username, ci.Password)
+			resp, err = doRequest(client, req)
+			if err != nil {
+				if errors.Is(err, errAuthorizationFailed) {
+					if kw.interactive {
+						cli.Println("invalid auth, trying manual authorisation")
+						continue
+					}
+				}
+
+				log.Debug(err.Error())
+				return errDownloadFailed
+			}
+		}
+
+		if authType == authorisationManual {
+			ci := keyring.CredentialsItem{}
+			ci.URL = url
+			ci, errFill := kw.fillCredentials(ci)
+			if errFill != nil {
+				return errFill
+			}
+
+			req.SetBasicAuth(ci.Username, ci.Password)
+			resp, err = doRequest(client, req)
+			if err != nil {
+				log.Debug(err.Error())
+				return errDownloadFailed
+			}
+		}
+
+		break
 	}
 
 	defer func() {
@@ -78,10 +137,6 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, ci keyring.Cre
 			fmt.Println(errFailedClose.Error())
 		}
 	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download package: %s", name)
-	}
 
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
@@ -111,6 +166,30 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, ci keyring.Cre
 	}
 
 	return nil
+}
+
+func doRequest(client *http.Client, req *http.Request) (*http.Response, error) {
+	resp, err := client.Do(req)
+	if err != nil {
+		resp.Body.Close() //nolint
+		return nil, err
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		return resp, nil
+	}
+
+	switch resp.StatusCode {
+	case http.StatusUnauthorized:
+		return nil, errAuthenticationRequired
+	case http.StatusForbidden:
+		return nil, errAuthorizationFailed
+	case http.StatusNotFound:
+		return nil, errRepositoryNotFound
+
+	default:
+		return resp, errHTTPUnknown
+	}
 }
 
 func untar(fpath, tpath string) (string, error) {

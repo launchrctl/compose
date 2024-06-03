@@ -6,7 +6,7 @@ on:
 
 jobs:
   no-tty-in-ci:
-    name: Ensure no TTY if user does not need to input anything
+    name: Ensure login command does not requires TTY if all options are passed
     runs-on: ubuntu-latest
 
     steps:
@@ -23,8 +23,8 @@ jobs:
           ls -lah bin/launchr
           ./bin/launchr login --url=http://***.git --username="***" --password="***" --keyring-passphrase="***"
 
-  commands-ok:
-    name: Ensure main commands do not fail
+  private-repo:
+    name: Ensure composition with private repo do not fail
     runs-on: ubuntu-latest
     env:
       EXAMPLE_REPO_USERNAME: ${{ secrets.EXAMPLE_REPO_USERNAME }}
@@ -35,7 +35,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Commands # TODO: Add another test with a public repo
+      - name: Commands
         run: |
           set -x
           date
@@ -56,7 +56,37 @@ jobs:
           cat plasma-compose.yaml
           ./bin/launchr login --url=https://github.com/davidferlay/compose-example.git --username="${EXAMPLE_REPO_USERNAME}" --password="${EXAMPLE_REPO_PASSWORD}" --keyring-passphrase="${KEYRING_PASSWORD}"
           ./bin/launchr compose --keyring-passphrase "${KEYRING_PASSWORD}" --skip-not-versioned --conflicts-verbosity --clean
-          ls -lah .compose/build
+          ls -lah .compose/build | grep -i FILE_FROM_EXAMPLE
+
+  public-repo:
+    name: Ensure composition with public repo do not fail
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Commands
+        run: |
+          set -x
+          date
+          pwd
+          whoami
+          make deps build
+          ls -lah bin/launchr
+          cat <<EOF > plasma-compose.yaml
+          name: launchr
+          dependencies:
+            - name: example
+              source:
+                type: git
+                ref: main
+                url: https://github.com/davidferlay/compose-example-public.git
+                strategy: null
+          EOF
+          cat plasma-compose.yaml
+          ./bin/launchr compose --skip-not-versioned --conflicts-verbosity --clean
+          ls -lah .compose/build | grep -i FILE_FROM_EXAMPLE
 
   go-linters:
     name: Run linters

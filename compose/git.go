@@ -1,11 +1,14 @@
 package compose
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/launchrctl/keyring"
 )
@@ -17,7 +20,7 @@ func newGit() Downloader {
 }
 
 // Download implements Downloader.Download interface
-func (g *gitDownloader) Download(pkg *Package, targetDir string, ci keyring.CredentialsItem) error {
+func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrapper) error {
 	fmt.Println(fmt.Sprintf("git fetch: " + pkg.GetURL()))
 
 	url := pkg.GetURL()
@@ -36,13 +39,73 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, ci keyring.Cred
 		options.ReferenceName = plumbing.NewTagReferenceName(pkg.GetTag())
 	}
 
-	if ci != (keyring.CredentialsItem{}) {
-		options.Auth = &http.BasicAuth{
-			Username: ci.Username,
-			Password: ci.Password,
+	auths := []authorizationMode{authorisationNone, authorisationKeyring, authorisationManual}
+	for _, authType := range auths {
+		if authType == authorisationNone {
+			_, err := git.PlainClone(targetDir, false, options)
+			if err != nil {
+				if errors.Is(err, transport.ErrAuthenticationRequired) {
+					log.Println("auth required, trying keyring authorisation")
+					continue
+				}
+
+				return err
+			}
 		}
+
+		if authType == authorisationKeyring {
+			ci, err := kw.getForURL(url)
+			if err != nil {
+				return err
+			}
+
+			options.Auth = &http.BasicAuth{
+				Username: ci.Username,
+				Password: ci.Password,
+			}
+
+			_, err = git.PlainClone(targetDir, false, options)
+			if err != nil {
+				if errors.Is(err, transport.ErrAuthorizationFailed) || errors.Is(err, transport.ErrAuthenticationRequired) {
+					if kw.interactive {
+						log.Println("invalid auth, trying manual authorisation")
+						continue
+					}
+				}
+
+				return err
+			}
+		}
+
+		if authType == authorisationManual {
+			ci := keyring.CredentialsItem{}
+			ci.URL = url
+			ci, err := kw.fillCredentials(ci)
+			if err != nil {
+				return err
+			}
+
+			options.Auth = &http.BasicAuth{
+				Username: ci.Username,
+				Password: ci.Password,
+			}
+
+			_, err = git.PlainClone(targetDir, false, options)
+			if err != nil {
+				return err
+			}
+		}
+
+		break
 	}
 
-	_, err := git.PlainClone(targetDir, false, options)
-	return err
+	return nil
 }
+
+type authorizationMode int
+
+const (
+	authorisationNone authorizationMode = iota
+	authorisationKeyring
+	authorisationManual
+)
