@@ -7,7 +7,7 @@ dependencies:
       url: https://github.com/example/compose-example.git
       # ref: branch-name
       # tag: tag-name
-      strategy: null
+      strategy: null # In case of conflicting file, default strategy is that local file is selected and package file ignored when composing 
 
   - name: package-2
     source:
