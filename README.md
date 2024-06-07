@@ -16,7 +16,10 @@ Where options are:
 * -s, --skip-not-versioned : Skip not versioned files from source directory (git only)
 * --conflicts-verbosity: Log files conflicts in format "[curent-package] - path to file > Selectef from [domain, other package or current-package]"
 
-example usage - `launchr compose -w=./folder/something -s=1 or -s=true --conflicts-verbosity`
+Example usage - `launchr compose -w=./folder/something -s=1 or -s=true --conflicts-verbosity`
+
+It's important to note that: if same file is present locally and also brought by a package, default strategy is that local file will be taken and package file ignored. [Different strategies](https://github.com/launchrctl/compose/blob/main/example/compose.example.yaml#L18-L35) can be difined to customize this behavior to your needs.
+
 
 ### `plasma-compose.yaml` File Format
 The "plasma-compose.yaml" file is a text file that specifies the dependencies for a package, along with any necessary metadata and sources for those dependencies.
