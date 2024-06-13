@@ -6,8 +6,14 @@ import (
 )
 
 const (
-	gitType  = "git"
-	httpType = "http"
+	// GitType is const for GIT source type download.
+	GitType = "git"
+	// SourceReferenceTag represents git tag source.
+	SourceReferenceTag = "tag"
+	// SourceReferenceBranch represents git branch source.
+	SourceReferenceBranch = "ref"
+	// HTTPType is const for http source type download.
+	HTTPType = "http"
 )
 
 // Downloader interface
@@ -31,9 +37,9 @@ func CreateDownloadManager(keyring *keyringWrapper) DownloadManager {
 
 func getDownloaderForPackage(downloadType string) Downloader {
 	switch {
-	case downloadType == gitType:
+	case downloadType == GitType:
 		return newGit()
-	case downloadType == httpType:
+	case downloadType == HTTPType:
 		return newHTTP()
 	default:
 		return newGit()
@@ -115,7 +121,7 @@ func downloadPackage(pkg *Package, targetDir string, kw *keyringWrapper) error {
 	}
 
 	// temporary
-	if dtype := pkg.GetType(); dtype == httpType {
+	if dtype := pkg.GetType(); dtype == HTTPType {
 		downloadPath = packagePath
 	}
 

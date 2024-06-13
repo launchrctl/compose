@@ -29,6 +29,12 @@ The file format includes the following elements:
 - source: The source for the package, including the type of source (Git, HTTP), URL or file path, merge strategy and other metadata.
 - dependencies: A list of required dependencies.
 
+List of strategies:
+- overwrite-local-file
+- remove-extra-local-files
+- ignore-extra-package-files
+- filter-package-files
+
 Example:
 
 ```yaml
@@ -43,7 +49,13 @@ dependencies:
     url: https://github.com/example/compose-example.git
     strategy:
       - name: remove-extra-local-files
-        path: path/to/remove-extra-local-files
+        path: 
+          - path/to/remove-extra-local-files
+      - name: ignore-extra-package-files
+        path:
+          - library/inventories/platform_nodes/configuration/dev.yaml
+          - library/inventories/platform_nodes/configuration/prod.yaml
+          - library/inventories/platform_nodes/configuration/whatever.yaml
 ```
 
 
@@ -57,3 +69,32 @@ The composition tool fetches and installs dependencies for a package by recursiv
 5. Repeat steps 1-4 for each package and its dependencies.
 
 During this process, the composition tool keeps track of the dependencies for each package.
+
+### Plasma-compose commands
+it's possible to manipulate plasma-compose.yaml file using commands:
+- plasmactl compose:add
+- plasmactl compose:update
+- plasmactl compose:delete
+
+For `compose:add` and `compose:update` there are 2 ways to submit data. With or without flags.
+Passing `--package` and `--url` to add command will automatically update plasma-compose file.
+For update command only `--package` required to update from CLI.
+
+For `compose:delete` it's possible to pass list of packaged to delete.
+
+In other cases, user will be prompted to CLI form to fill necessary data of packages.
+
+Example of usage
+
+
+```
+launchr compose:add --url some-url --type http
+launchr compose:add --package package-name --url some-url --ref v1.0.0
+launchr compose:update --package package-name --url some-url --ref v1.0.0
+
+launchr compose:add --package package-name --url some-url --ref v1.0.0 --strategy overwrite-local-file --strategy-path "path1|path2"
+launchr compose:add --package package-name --url some-url --ref v1.0.0 --strategy overwrite-local-file,remove-extra-local-files --strategy-path "path1|path2,path3|path4"
+launchr compose:add --package package-name --url some-url --ref v1.0.0 --strategy overwrite-local-file --strategy-path "path1|path2" --strategy remove-extra-local-files --strategy-path "path3|path4"
+
+
+```

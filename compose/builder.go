@@ -44,6 +44,18 @@ const (
 	packageStrategy         mergeStrategyTarget  = 2
 )
 
+var (
+
+	// StrategyOverwriteLocal string const
+	StrategyOverwriteLocal = "overwrite-local-file"
+	// StrategyRemoveExtraLocal string const
+	StrategyRemoveExtraLocal = "remove-extra-local-files"
+	// StrategyIgnoreExtraPackage string const
+	StrategyIgnoreExtraPackage = "ignore-extra-package-files"
+	// StrategyFilterPackage string const
+	StrategyFilterPackage = "filter-package-files"
+)
+
 // return conflict const (0 - no warning, 1 - conflict with local, 2 conflict with pacakge)
 
 func retrieveStrategies(packages []*Package) ([]*mergeStrategy, map[string][]*mergeStrategy) {
@@ -75,14 +87,14 @@ func identifyStrategy(name string) (mergeStrategyType, mergeStrategyTarget) {
 	t := packageStrategy
 
 	switch name {
-	case "overwrite-local-file":
+	case StrategyOverwriteLocal:
 		s = overwriteLocalFile
-	case "remove-extra-local-files":
+	case StrategyRemoveExtraLocal:
 		s = removeExtraLocalFiles
 		t = localStrategy
-	case "ignore-extra-package-files":
+	case StrategyIgnoreExtraPackage:
 		s = ignoreExtraPackageFiles
-	case "filter-package-files":
+	case StrategyFilterPackage:
 		s = filterPackageFiles
 	}
 
@@ -323,7 +335,7 @@ func addStrategyEntries(strategies []*mergeStrategy, entriesTree []*fsEntry, ent
 	for _, ms := range strategies {
 		switch ms.s {
 		case overwriteLocalFile:
-			// Skip strategy if filepath does not match strategy paths
+			// Skip strategy if filepath does not match strategy Paths
 			if !ensureStrategyPrefixPath(path, ms.paths) {
 				continue
 			}
@@ -336,7 +348,7 @@ func addStrategyEntries(strategies []*mergeStrategy, entriesTree []*fsEntry, ent
 				localMapEntry.Entry = entry.Entry
 				localMapEntry.From = entry.From
 
-				// Strategy replaces local paths by package one.
+				// Strategy replaces local Paths by package one.
 				conflictResolve = resolveToPackage
 			}
 		case filterPackageFiles:
@@ -346,7 +358,7 @@ func addStrategyEntries(strategies []*mergeStrategy, entriesTree []*fsEntry, ent
 			}
 
 		case ignoreExtraPackageFiles:
-			// Skip strategy if filepath does not match strategy paths
+			// Skip strategy if filepath does not match strategy Paths
 			if !ensureStrategyPrefixPath(path, ms.paths) {
 				continue
 			}
