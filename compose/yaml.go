@@ -1,9 +1,15 @@
 package compose
 
 import (
+	"fmt"
+	"os"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	composePermissions = 0644
 )
 
 // YamlCompose stores compose definition
@@ -25,7 +31,7 @@ type Dependency struct {
 	Source Source `yaml:"source,omitempty"`
 }
 
-// Strategy stores packages merge strategy name and paths
+// Strategy stores packages merge strategy name and Paths
 type Strategy struct {
 	Name  string   `yaml:"name"`
 	Paths []string `yaml:"path"`
@@ -67,7 +73,7 @@ func (p *Package) GetName() string {
 func (p *Package) GetType() string {
 	t := p.Source.Type
 	if t == "" {
-		return gitType
+		return GitType
 	}
 
 	return strings.ToLower(t)
@@ -105,4 +111,18 @@ func parseComposeYaml(input []byte) (*YamlCompose, error) {
 	cfg := YamlCompose{}
 	err := yaml.Unmarshal(input, &cfg)
 	return &cfg, err
+}
+
+func writeComposeYaml(compose *YamlCompose) error {
+	yamlContent, err := yaml.Marshal(compose)
+	if err != nil {
+		return fmt.Errorf("could not marshal struct into YAML: %v", err)
+	}
+
+	err = os.WriteFile(composeFile, yamlContent, os.FileMode(composePermissions))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
