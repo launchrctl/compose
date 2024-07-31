@@ -19,7 +19,6 @@ jobs:
           date
           pwd
           whoami
-          make xxx
           make deps build
           ls -lah bin/launchr
           ./bin/launchr login --url=http://***.git --username="***" --password="***" --keyring-passphrase="***"

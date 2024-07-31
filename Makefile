@@ -5,7 +5,8 @@ FIRST_GOPATH:=$(firstword $(subst :, ,$(GOPATH)))
 
 # Build available information.
 GIT_HASH:=$(shell git log --format="%h" -n 1 2> /dev/null)
-GIT_BRANCH:=$(shell git branch 2> /dev/null | grep '*' | cut -f2 -d' ')
+RAW_GIT_BRANCH := $(if $(GITHUB_REF_NAME),$(GITHUB_REF_NAME),$(shell git branch 2> /dev/null | grep '*' | cut -f2 -d' '))
+GIT_BRANCH = $(shell echo $(RAW_GIT_BRANCH) | sed 's/[^a-zA-Z0-9-]//g')
 APP_VERSION:="$(GIT_BRANCH)-$(GIT_HASH)"
 GOPKG:=github.com/launchrctl/launchr
 
@@ -42,7 +43,11 @@ test:
 	$(info Running tests...)
 	go test ./...
 
-xxx:
+# Echo vars for debbug
+.PHONY: debugvars
+debugvars:
+	$(shell echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}")
+	$(shell echo "RAW_GIT_BRANCH=${SANITIZED_GIT_BRANCH}")
 	$(shell echo "GIT_BRANCH=$(GIT_BRANCH)")
 	$(shell echo "GIT_HASH=$(GIT_HASH)")
 	$(shell echo "APP_VERSION=$(APP_VERSION)")
