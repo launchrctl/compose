@@ -42,6 +42,11 @@ test:
 	$(info Running tests...)
 	go test ./...
 
+xxx:
+	$(shell echo "GIT_BRANCH=$(GIT_BRANCH)")
+	$(shell echo "GIT_HASH=$(GIT_HASH)")
+	$(shell echo "APP_VERSION=$(APP_VERSION)")
+
 # Build launchr
 .PHONY: build
 build:
