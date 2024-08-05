@@ -39,7 +39,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 		options.ReferenceName = plumbing.NewTagReferenceName(pkg.GetTag())
 	}
 
-	auths := []authorizationMode{authorisationNone, authorisationKeyring, authorisationManual}
+	auths := []authorizationMode{authorisationKeyringNoInteractive, authorisationNone, authorisationKeyring, authorisationManual}
 	for _, authType := range auths {
 		options.Auth = nil
 		if authType == authorisationNone {
@@ -56,10 +56,13 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 			}
 		}
 
-		if authType == authorisationKeyring {
+		if authType == authorisationKeyring || authType == authorisationKeyringNoInteractive {
 			fmt.Println("Auth Keyring")
-			ci, err := kw.getForURL(url)
+			ci, err := kw.getForURL(url, authType == authorisationKeyringNoInteractive)
 			if err != nil {
+				if errors.Is(err, keyring.ErrNotFound) {
+					continue
+				}
 				return err
 			}
 
@@ -82,6 +85,10 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 		}
 
 		if authType == authorisationManual {
+			if !kw.interactive {
+				return fmt.Errorf("debug stop error")
+			}
+
 			fmt.Println("Auth Manual")
 			ci := keyring.CredentialsItem{}
 			ci.URL = url
@@ -111,6 +118,7 @@ type authorizationMode int
 
 const (
 	authorisationNone authorizationMode = iota
+	authorisationKeyringNoInteractive
 	authorisationKeyring
 	authorisationManual
 )

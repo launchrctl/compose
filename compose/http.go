@@ -93,7 +93,7 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWra
 		}
 
 		if authType == authorisationKeyring {
-			ci, errGet := kw.getForURL(url)
+			ci, errGet := kw.getForURL(url, false)
 			if errGet != nil {
 				return errGet
 			}

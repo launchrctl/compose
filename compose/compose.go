@@ -4,6 +4,7 @@ package compose
 import (
 	"errors"
 	"fmt"
+	"github.com/launchrctl/launchr/pkg/cli"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -58,9 +59,10 @@ type keyringWrapper struct {
 	shouldUpdate   bool
 }
 
-func (kw *keyringWrapper) getForURL(url string) (keyring.CredentialsItem, error) {
+func (kw *keyringWrapper) getForURL(url string, skipEmpty bool) (keyring.CredentialsItem, error) {
 	ci, errGet := kw.keyringService.GetForURL(url)
 	if errGet != nil {
+		cli.Println(errGet.Error())
 		if errors.Is(errGet, keyring.ErrEmptyPass) {
 			return ci, errGet
 		} else if !errors.Is(errGet, keyring.ErrNotFound) {
@@ -68,7 +70,7 @@ func (kw *keyringWrapper) getForURL(url string) (keyring.CredentialsItem, error)
 			return ci, errors.New("the keyring is malformed or wrong passphrase provided")
 		}
 
-		if !kw.interactive {
+		if !kw.interactive || skipEmpty {
 			return ci, errGet
 		}
 
