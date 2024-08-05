@@ -41,7 +41,10 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 
 	auths := []authorizationMode{authorisationNone, authorisationKeyring, authorisationManual}
 	for _, authType := range auths {
+		options.Auth = nil
 		if authType == authorisationNone {
+			fmt.Println("Auth None")
+			options.Auth = &http.BasicAuth{}
 			_, err := git.PlainClone(targetDir, false, options)
 			if err != nil {
 				if errors.Is(err, transport.ErrAuthenticationRequired) {
@@ -54,6 +57,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 		}
 
 		if authType == authorisationKeyring {
+			fmt.Println("Auth Keyring")
 			ci, err := kw.getForURL(url)
 			if err != nil {
 				return err
@@ -78,6 +82,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 		}
 
 		if authType == authorisationManual {
+			fmt.Println("Auth Manual")
 			ci := keyring.CredentialsItem{}
 			ci.URL = url
 			ci, err := kw.fillCredentials(ci)
