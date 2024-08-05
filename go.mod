@@ -15,6 +15,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+replace github.com/go-git/go-git/v5 => github.com/iignatevich/go-git-debug/v5 v5.12.1
+
 require (
 	filippo.io/age v1.1.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
