@@ -3,14 +3,16 @@ package compose
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
+
+	"github.com/launchrctl/launchr/pkg/cli"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/launchrctl/keyring"
+	"github.com/launchrctl/launchr/pkg/log"
 )
 
 type gitDownloader struct{}
@@ -41,11 +43,14 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 
 	auths := []authorizationMode{authorisationNone, authorisationKeyring, authorisationManual}
 	for _, authType := range auths {
+		options.Auth = nil
 		if authType == authorisationNone {
+			log.Debug("Auth None")
+			options.Auth = &http.BasicAuth{}
 			_, err := git.PlainClone(targetDir, false, options)
 			if err != nil {
 				if errors.Is(err, transport.ErrAuthenticationRequired) {
-					log.Println("auth required, trying keyring authorisation")
+					cli.Println("auth required, trying keyring authorisation")
 					continue
 				}
 
@@ -54,6 +59,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 		}
 
 		if authType == authorisationKeyring {
+			log.Debug("Auth Keyring")
 			ci, err := kw.getForURL(url)
 			if err != nil {
 				return err
@@ -68,7 +74,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 			if err != nil {
 				if errors.Is(err, transport.ErrAuthorizationFailed) || errors.Is(err, transport.ErrAuthenticationRequired) {
 					if kw.interactive {
-						log.Println("invalid auth, trying manual authorisation")
+						cli.Println("invalid auth, trying manual authorisation")
 						continue
 					}
 				}
@@ -78,6 +84,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 		}
 
 		if authType == authorisationManual {
+			log.Debug("Auth Manual")
 			ci := keyring.CredentialsItem{}
 			ci.URL = url
 			ci, err := kw.fillCredentials(ci)

@@ -79,7 +79,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	composeCmd.Flags().BoolVarP(&skipNotVersioned, "skip-not-versioned", "s", false, "Skip not versioned files from source directory (git only)")
 	composeCmd.Flags().BoolVar(&conflictsVerbosity, "conflicts-verbosity", false, "Log files conflicts")
 	composeCmd.Flags().BoolVar(&clean, "clean", false, "Remove .compose dir on start")
-	composeCmd.Flags().BoolVar(&interactive, "interactive", true, "Interactive mode allows to submit user credentials during action")
+	composeCmd.Flags().BoolVar(&interactive, "interactive", false, "Interactive mode allows to submit user credentials during action")
 
 	composeDependency := &compose.Dependency{}
 	strategies := &compose.RawStrategies{}

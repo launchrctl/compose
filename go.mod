@@ -6,7 +6,6 @@ toolchain go1.21.4
 
 require (
 	dario.cat/mergo v1.0.0
-	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/huh v0.4.2
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/launchrctl/keyring v0.2.0
@@ -15,6 +14,8 @@ require (
 	github.com/stevenle/topsort v0.2.0
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+replace github.com/go-git/go-git/v5 => github.com/iignatevich/go-git-debug/v5 v5.12.2
 
 require (
 	filippo.io/age v1.1.1 // indirect
@@ -25,6 +26,7 @@ require (
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/catppuccin/go v0.2.0 // indirect
+	github.com/charmbracelet/bubbles v0.18.0 // indirect
 	github.com/charmbracelet/bubbletea v0.26.3 // indirect
 	github.com/charmbracelet/lipgloss v0.11.0 // indirect
 	github.com/charmbracelet/x/ansi v0.1.1 // indirect
