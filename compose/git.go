@@ -29,9 +29,10 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 	}
 
 	options := &git.CloneOptions{
-		URL:      url,
-		Progress: os.Stdout,
-		Depth:    1,
+		URL:          url,
+		Progress:     os.Stdout,
+		SingleBranch: true,
+		//Depth:        1,
 	}
 	if pkg.GetRef() != "" {
 		options.ReferenceName = plumbing.NewBranchReferenceName(pkg.GetRef())
