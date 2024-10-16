@@ -2,8 +2,6 @@ package compose
 
 import (
 	"errors"
-	"fmt"
-	"log"
 	"os"
 
 	"github.com/go-git/go-git/v5"
@@ -11,6 +9,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/launchrctl/keyring"
+	"github.com/launchrctl/launchr"
 )
 
 type gitDownloader struct{}
@@ -21,7 +20,7 @@ func newGit() Downloader {
 
 // Download implements Downloader.Download interface
 func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrapper) error {
-	fmt.Println(fmt.Sprintf("git fetch: " + pkg.GetURL()))
+	launchr.Term().Printfln("git fetch: %s", pkg.GetURL())
 
 	url := pkg.GetURL()
 	if url == "" {
@@ -29,9 +28,9 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 	}
 
 	options := &git.CloneOptions{
-		URL:      url,
-		Progress: os.Stdout,
-		Depth:    1,
+		URL:          url,
+		Progress:     os.Stdout,
+		SingleBranch: true,
 	}
 	if pkg.GetRef() != "" {
 		options.ReferenceName = plumbing.NewBranchReferenceName(pkg.GetRef())
@@ -45,7 +44,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 			_, err := git.PlainClone(targetDir, false, options)
 			if err != nil {
 				if errors.Is(err, transport.ErrAuthenticationRequired) {
-					log.Println("auth required, trying keyring authorisation")
+					launchr.Term().Println("auth required, trying keyring authorisation")
 					continue
 				}
 
@@ -68,7 +67,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string, kw *keyringWrap
 			if err != nil {
 				if errors.Is(err, transport.ErrAuthorizationFailed) || errors.Is(err, transport.ErrAuthenticationRequired) {
 					if kw.interactive {
-						log.Println("invalid auth, trying manual authorisation")
+						launchr.Term().Println("invalid auth, trying manual authorisation")
 						continue
 					}
 				}

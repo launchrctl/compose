@@ -1,4 +1,4 @@
-export GOSUMDB=off
+#export GOSUMDB=off
 
 GOPATH?=$(HOME)/go
 FIRST_GOPATH:=$(firstword $(subst :, ,$(GOPATH)))
