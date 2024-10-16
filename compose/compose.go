@@ -3,14 +3,12 @@ package compose
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 
-	"github.com/launchrctl/launchr/pkg/log"
-
 	"github.com/launchrctl/keyring"
+	"github.com/launchrctl/launchr"
 )
 
 const (
@@ -64,7 +62,7 @@ func (kw *keyringWrapper) getForURL(url string) (keyring.CredentialsItem, error)
 		if errors.Is(errGet, keyring.ErrEmptyPass) {
 			return ci, errGet
 		} else if !errors.Is(errGet, keyring.ErrNotFound) {
-			log.Debug("%s", errGet)
+			launchr.Log().Debug(errGet.Error())
 			return ci, errors.New("the keyring is malformed or wrong passphrase provided")
 		}
 
@@ -92,7 +90,7 @@ func (kw *keyringWrapper) getForURL(url string) (keyring.CredentialsItem, error)
 
 func (kw *keyringWrapper) fillCredentials(ci keyring.CredentialsItem) (keyring.CredentialsItem, error) {
 	if ci.URL != "" {
-		fmt.Printf("Please add login and password for URL - %s\n", ci.URL)
+		launchr.Term().Printfln("Please add login and password for URL - %s", ci.URL)
 	}
 	err := keyring.RequestCredentialsFromTty(&ci)
 	if err != nil {
@@ -131,14 +129,14 @@ func (c *Composer) prepareInstall() (string, string, error) {
 	buildPath := c.getPath(BuildDir)
 	packagesPath := c.getPath(c.options.WorkingDir)
 
-	fmt.Printf("Cleaning build dir: %s\n", BuildDir)
+	launchr.Term().Printfln("Cleaning build dir: %s", BuildDir)
 	err := os.RemoveAll(buildPath)
 	if err != nil {
 		return "", "", err
 	}
 
 	if c.options.Clean {
-		fmt.Printf("Cleaning packages dir: %s\n", packagesPath)
+		launchr.Term().Printfln("Cleaning packages dir: %s", packagesPath)
 		err = os.RemoveAll(packagesPath)
 		if err != nil {
 			return "", "", err

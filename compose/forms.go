@@ -9,7 +9,7 @@ import (
 
 	"dario.cat/mergo"
 	"github.com/charmbracelet/huh"
-	"github.com/launchrctl/launchr/pkg/cli"
+	"github.com/launchrctl/launchr"
 )
 
 // RawStrategies represents collection of submitted flags for strategies.
@@ -73,7 +73,7 @@ func AddPackage(doCreate bool, newDependency *Dependency, rawStrategies *RawStra
 
 	sanitizeDependency(newDependency)
 	config.Dependencies = append(config.Dependencies, *newDependency)
-	cli.Println("Saving plasma-compose...")
+	launchr.Term().Println("Saving plasma-compose...")
 	sortPackages(config)
 	err = writeComposeYaml(config)
 
@@ -114,7 +114,7 @@ func UpdatePackage(dependency *Dependency, rawStrategies *RawStrategies, dir str
 	}
 
 	sanitizeDependency(toUpdate)
-	cli.Println("Saving plasma-compose...")
+	launchr.Term().Println("Saving plasma-compose...")
 	sortPackages(config)
 	err = writeComposeYaml(config)
 
@@ -178,7 +178,7 @@ func UpdatePackages(dir string) error {
 		}
 	}
 
-	cli.Println("Saving plasma-compose...")
+	launchr.Term().Println("Saving plasma-compose...")
 	var newDeps []Dependency
 	for _, dep := range packagesMap {
 		newDeps = append(newDeps, *dep)
@@ -238,12 +238,12 @@ OUTER:
 	}
 
 	if saveRequired {
-		cli.Println("Updating plasma-compose...")
+		launchr.Term().Println("Updating plasma-compose...")
 		config.Dependencies = dependencies
 		sortPackages(config)
 		err = writeComposeYaml(config)
 	} else {
-		cli.Println("Nothing to update, quiting")
+		launchr.Term().Println("Nothing to update, quiting")
 	}
 
 	return err

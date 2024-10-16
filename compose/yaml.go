@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	composePermissions = 0644
+	composePermissions uint32 = 0644
 )
 
 // YamlCompose stores compose definition
