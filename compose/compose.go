@@ -3,7 +3,6 @@ package compose
 
 import (
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -153,20 +152,6 @@ func (c *Composer) getPath(value string) string {
 // EnsureDirExists checks if directory exists, otherwise create it
 func EnsureDirExists(path string) error {
 	return os.MkdirAll(path, dirPermissions)
-}
-
-func composeLookup(fsys fs.FS) (*YamlCompose, error) {
-	f, err := fs.ReadFile(fsys, composeFile)
-	if err != nil {
-		return &YamlCompose{}, errComposeNotExists
-	}
-
-	cfg, err := parseComposeYaml(f)
-	if err != nil {
-		return &YamlCompose{}, errComposeBadStructure
-	}
-
-	return cfg, nil
 }
 
 func (c *Composer) getCompose() *YamlCompose {

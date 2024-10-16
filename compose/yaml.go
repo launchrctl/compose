@@ -2,9 +2,11 @@ package compose
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 
+	"github.com/launchrctl/launchr"
 	"gopkg.in/yaml.v3"
 )
 
@@ -105,6 +107,42 @@ func (p *Package) GetTarget() string {
 	}
 
 	return target
+}
+
+// Compose interface for service to open and parse yaml compose.
+type Compose interface {
+	launchr.Service
+	Lookup(fsys fs.FS) (*YamlCompose, error)
+}
+
+type composeLookupService struct{}
+
+// NewComposeService creates instance of new Compose service.
+func NewComposeService() Compose {
+	return &composeLookupService{}
+}
+
+func (l *composeLookupService) Lookup(fsys fs.FS) (*YamlCompose, error) {
+	return composeLookup(fsys)
+}
+
+// ServiceInfo implements launchr.Service interface.
+func (l *composeLookupService) ServiceInfo() launchr.ServiceInfo {
+	return launchr.ServiceInfo{}
+}
+
+func composeLookup(fsys fs.FS) (*YamlCompose, error) {
+	f, err := fs.ReadFile(fsys, composeFile)
+	if err != nil {
+		return &YamlCompose{}, errComposeNotExists
+	}
+
+	cfg, err := parseComposeYaml(f)
+	if err != nil {
+		return &YamlCompose{}, errComposeBadStructure
+	}
+
+	return cfg, nil
 }
 
 func parseComposeYaml(input []byte) (*YamlCompose, error) {

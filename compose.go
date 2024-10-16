@@ -23,6 +23,7 @@ func init() {
 type Plugin struct {
 	wd string
 	k  keyring.Keyring
+	c  compose.Compose
 }
 
 // PluginInfo implements launchr.Plugin interface.
@@ -32,6 +33,9 @@ func (p *Plugin) PluginInfo() launchr.PluginInfo {
 
 // OnAppInit implements launchr.Plugin interface.
 func (p *Plugin) OnAppInit(app launchr.App) error {
+	p.c = compose.NewComposeService()
+	app.AddService(p.c)
+
 	app.GetService(&p.k)
 	p.wd = app.GetWD()
 	buildDir := filepath.Join(p.wd, compose.BuildDir)

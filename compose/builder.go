@@ -222,7 +222,7 @@ func (b *Builder) build() error {
 	targetsMap := getTargetsMap(b.packages)
 
 	if b.logConflicts {
-		launchr.Term().Printf("Conflicting files:\n")
+		launchr.Term().Info().Printf("Conflicting files:\n")
 	}
 
 	for i := 0; i < len(items); i++ {
@@ -313,7 +313,7 @@ func logConflictResolve(resolveto mergeConflictResolve, path, pkgName string, en
 		return
 	}
 
-	launchr.Term().Printfln("[%s] - %s > Selected from %s", pkgName, path, entry.From)
+	launchr.Term().Info().Printfln("[%s] - %s > Selected from %s", pkgName, path, entry.From)
 }
 
 func addEntries(entriesTree []*fsEntry, entriesMap map[string]*fsEntry, entry *fsEntry, path string) ([]*fsEntry, mergeConflictResolve) {
