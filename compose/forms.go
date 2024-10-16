@@ -20,7 +20,7 @@ type RawStrategies struct {
 
 // AddPackage adds a new package to plasma-compose.
 func AddPackage(doCreate bool, newDependency *Dependency, rawStrategies *RawStrategies, dir string) error {
-	config, err := composeLookup(os.DirFS(dir))
+	config, err := Lookup(os.DirFS(dir))
 	if err != nil {
 		if !errors.Is(err, errComposeNotExists) {
 			return err
@@ -82,7 +82,7 @@ func AddPackage(doCreate bool, newDependency *Dependency, rawStrategies *RawStra
 
 // UpdatePackage updates a single package in plasma-compose.
 func UpdatePackage(dependency *Dependency, rawStrategies *RawStrategies, dir string) error {
-	config, err := composeLookup(os.DirFS(dir))
+	config, err := Lookup(os.DirFS(dir))
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func UpdatePackage(dependency *Dependency, rawStrategies *RawStrategies, dir str
 
 // UpdatePackages updates packages in plasma-compose in interactive way.
 func UpdatePackages(dir string) error {
-	config, err := composeLookup(os.DirFS(dir))
+	config, err := Lookup(os.DirFS(dir))
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func UpdatePackages(dir string) error {
 
 // DeletePackages removes packages plasma-compose.
 func DeletePackages(packages []string, dir string) error {
-	config, err := composeLookup(os.DirFS(dir))
+	config, err := Lookup(os.DirFS(dir))
 	if err != nil {
 		return err
 	}

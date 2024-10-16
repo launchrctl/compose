@@ -41,7 +41,7 @@ type ComposerOptions struct {
 
 // CreateComposer instance
 func CreateComposer(pwd string, opts ComposerOptions, k keyring.Keyring) (*Composer, error) {
-	config, err := composeLookup(os.DirFS(pwd))
+	config, err := Lookup(os.DirFS(pwd))
 	if err != nil {
 		return nil, err
 	}

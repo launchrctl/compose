@@ -294,14 +294,14 @@ func unzip(fpath, tpath string) (string, error) {
 		}
 		if f.FileInfo().IsDir() {
 			rootDir = f.Name
-			err = os.MkdirAll(filePath, os.ModePerm)
+			err = os.MkdirAll(filePath, os.ModePerm) //nolint
 			if err != nil {
 				return rootDir, err
 			}
 			continue
 		}
 
-		if err = os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+		if err = os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil { //nolint
 			return rootDir, err
 		}
 

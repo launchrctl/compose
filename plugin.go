@@ -19,23 +19,19 @@ func init() {
 	launchr.RegisterPlugin(&Plugin{})
 }
 
-// Plugin implements launchr.Plugin to provide compose functionality.
+// Plugin is [launchr.Plugin] plugin providing compose.
 type Plugin struct {
 	wd string
 	k  keyring.Keyring
-	c  compose.Compose
 }
 
-// PluginInfo implements launchr.Plugin interface.
+// PluginInfo implements [launchr.Plugin] interface.
 func (p *Plugin) PluginInfo() launchr.PluginInfo {
 	return launchr.PluginInfo{Weight: 10}
 }
 
-// OnAppInit implements launchr.Plugin interface.
+// OnAppInit implements [launchr.Plugin] interface.
 func (p *Plugin) OnAppInit(app launchr.App) error {
-	p.c = compose.NewComposeService()
-	app.AddService(p.c)
-
 	app.GetService(&p.k)
 	p.wd = app.GetWD()
 	buildDir := filepath.Join(p.wd, compose.BuildDir)
