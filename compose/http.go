@@ -14,12 +14,11 @@ import (
 	"strings"
 
 	"github.com/launchrctl/keyring"
-	"github.com/launchrctl/launchr/pkg/cli"
-	"github.com/launchrctl/launchr/pkg/log"
+	"github.com/launchrctl/launchr"
 )
 
 var (
-	errInvalidaFilepath       = errors.New("invalid filepath")
+	errInvalidFilepath        = errors.New("invalid filepath")
 	errNoURL                  = errors.New("invalid url")
 	errFailedClose            = errors.New("failed to close stream")
 	errRepositoryNotFound     = errors.New("repository not found")
@@ -48,7 +47,7 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWra
 		return errNoURL
 	}
 
-	fmt.Println(fmt.Sprintf("http download: " + name))
+	launchr.Term().Printfln("http download: %s", name)
 	fpath := filepath.Clean(filepath.Join(targetDir, name))
 
 	err := os.MkdirAll(targetDir, dirPermissions)
@@ -63,7 +62,7 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWra
 
 	defer func() {
 		if err = out.Close(); err != nil {
-			fmt.Println(errFailedClose.Error())
+			launchr.Log().Debug(errFailedClose.Error())
 		}
 	}()
 
@@ -83,11 +82,11 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWra
 			resp, err = doRequest(client, req)
 			if err != nil {
 				if errors.Is(err, errAuthenticationRequired) {
-					cli.Println("auth required, trying keyring authorisation")
+					launchr.Term().Println("auth required, trying keyring authorisation")
 					continue
 				}
 
-				log.Debug(err.Error())
+				launchr.Log().Debug(err.Error())
 				return errDownloadFailed
 			}
 		}
@@ -103,12 +102,12 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWra
 			if err != nil {
 				if errors.Is(err, errAuthorizationFailed) {
 					if kw.interactive {
-						cli.Println("invalid auth, trying manual authorisation")
+						launchr.Term().Println("invalid auth, trying manual authorisation")
 						continue
 					}
 				}
 
-				log.Debug(err.Error())
+				launchr.Log().Debug(err.Error())
 				return errDownloadFailed
 			}
 		}
@@ -124,7 +123,7 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWra
 			req.SetBasicAuth(ci.Username, ci.Password)
 			resp, err = doRequest(client, req)
 			if err != nil {
-				log.Debug(err.Error())
+				launchr.Log().Debug(err.Error())
 				return errDownloadFailed
 			}
 		}
@@ -134,7 +133,7 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWra
 
 	defer func() {
 		if err = resp.Body.Close(); err != nil {
-			fmt.Println(errFailedClose.Error())
+			launchr.Log().Debug(errFailedClose.Error())
 		}
 	}()
 
@@ -232,17 +231,17 @@ func untar(fpath, tpath string) (string, error) {
 		// the target location where the dir/file should be created
 		target, err := sanitizeArchivePath(tpath, header.Name)
 		if err != nil {
-			return rootDir, errInvalidaFilepath
+			return rootDir, errInvalidFilepath
 		}
 
 		if !strings.HasPrefix(target, filepath.Clean(tpath)) {
-			return rootDir, errInvalidaFilepath
+			return rootDir, errInvalidFilepath
 		}
 
 		// check the file type
 		switch header.Typeflag {
 
-		// if its a dir and it doesn't exist create it
+		// if it's a dir, and it doesn't exist create it
 		case tar.TypeDir:
 			rootDir = header.Name
 			if _, err := os.Stat(target); err != nil {
@@ -253,7 +252,7 @@ func untar(fpath, tpath string) (string, error) {
 
 		// if it's a file create it
 		case tar.TypeReg:
-			f, err := os.OpenFile(filepath.Clean(target), os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			f, err := os.OpenFile(filepath.Clean(target), os.O_CREATE|os.O_RDWR, header.FileInfo().Mode())
 			if err != nil {
 				return rootDir, err
 			}
@@ -291,18 +290,18 @@ func unzip(fpath, tpath string) (string, error) {
 	for _, f := range archive.File {
 		filePath, err := sanitizeArchivePath(tpath, f.Name)
 		if err != nil || !strings.HasPrefix(filePath, filepath.Clean(tpath)+string(os.PathSeparator)) {
-			return rootDir, errInvalidaFilepath
+			return rootDir, errInvalidFilepath
 		}
 		if f.FileInfo().IsDir() {
 			rootDir = f.Name
-			err = os.MkdirAll(filePath, os.ModePerm)
+			err = os.MkdirAll(filePath, os.ModePerm) //nolint
 			if err != nil {
 				return rootDir, err
 			}
 			continue
 		}
 
-		if err = os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+		if err = os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil { //nolint
 			return rootDir, err
 		}
 
