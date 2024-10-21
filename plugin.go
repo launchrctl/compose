@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/launchrctl/launchr/pkg/cli"
-
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
 	"github.com/launchrctl/launchr/pkg/action"
@@ -21,18 +19,18 @@ func init() {
 	launchr.RegisterPlugin(&Plugin{})
 }
 
-// Plugin implements launchr.Plugin to provide compose functionality.
+// Plugin is [launchr.Plugin] plugin providing compose.
 type Plugin struct {
 	wd string
 	k  keyring.Keyring
 }
 
-// PluginInfo implements launchr.Plugin interface.
+// PluginInfo implements [launchr.Plugin] interface.
 func (p *Plugin) PluginInfo() launchr.PluginInfo {
 	return launchr.PluginInfo{Weight: 10}
 }
 
-// OnAppInit implements launchr.Plugin interface.
+// OnAppInit implements [launchr.Plugin] interface.
 func (p *Plugin) OnAppInit(app launchr.App) error {
 	app.GetService(&p.k)
 	p.wd = app.GetWD()
@@ -52,7 +50,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	var composeCmd = &cobra.Command{
 		Use:   "compose",
 		Short: "Composes filesystem (files & dirs)",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
 
@@ -90,7 +88,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return packagePreRunValidate(cmd, args)
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
 
@@ -104,7 +102,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return packagePreRunValidate(cmd, args)
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
 
@@ -120,7 +118,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	var deleteCmd = &cobra.Command{
 		Use:   "compose:delete",
 		Short: "Remove a package from plasma-compose",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
 
@@ -167,11 +165,11 @@ func packagePreRunValidate(cmd *cobra.Command, _ []string) error {
 
 	if typeFlag == compose.HTTPType {
 		if tagChanged {
-			cli.Println("Tag can't be used with HTTP source")
+			launchr.Term().Warning().Println("Tag can't be used with HTTP source")
 			err = cmd.Flags().Set("tag", "")
 		}
 		if refChanged {
-			cli.Println("Ref can't be used with HTTP source")
+			launchr.Term().Warning().Println("Ref can't be used with HTTP source")
 			err = cmd.Flags().Set("ref", "")
 		}
 	}

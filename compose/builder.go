@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/launchrctl/launchr"
 	"github.com/stevenle/topsort"
 )
 
@@ -150,7 +151,7 @@ func getVersionedMap(gitDir string) (map[string]bool, error) {
 }
 
 func (b *Builder) build() error {
-	fmt.Println("Creating composition...")
+	launchr.Term().Println("Creating composition...")
 	err := EnsureDirExists(b.targetDir)
 	if err != nil {
 		return err
@@ -221,7 +222,7 @@ func (b *Builder) build() error {
 	targetsMap := getTargetsMap(b.packages)
 
 	if b.logConflicts {
-		fmt.Print("Conflicting files:\n")
+		launchr.Term().Info().Printf("Conflicting files:\n")
 	}
 
 	for i := 0; i < len(items); i++ {
@@ -312,7 +313,7 @@ func logConflictResolve(resolveto mergeConflictResolve, path, pkgName string, en
 		return
 	}
 
-	fmt.Printf("[%s] - %s > Selected from %s\n", pkgName, path, entry.From)
+	launchr.Term().Info().Printfln("[%s] - %s > Selected from %s", pkgName, path, entry.From)
 }
 
 func addEntries(entriesTree []*fsEntry, entriesMap map[string]*fsEntry, entry *fsEntry, path string) ([]*fsEntry, mergeConflictResolve) {

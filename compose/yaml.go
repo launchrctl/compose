@@ -2,6 +2,7 @@ package compose
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 )
 
 var (
-	composePermissions = 0644
+	composePermissions uint32 = 0644
 )
 
 // YamlCompose stores compose definition
@@ -105,6 +106,21 @@ func (p *Package) GetTarget() string {
 	}
 
 	return target
+}
+
+// Lookup allows to search compose file, read and parse it.
+func Lookup(fsys fs.FS) (*YamlCompose, error) {
+	f, err := fs.ReadFile(fsys, composeFile)
+	if err != nil {
+		return &YamlCompose{}, errComposeNotExists
+	}
+
+	cfg, err := parseComposeYaml(f)
+	if err != nil {
+		return &YamlCompose{}, errComposeBadStructure
+	}
+
+	return cfg, nil
 }
 
 func parseComposeYaml(input []byte) (*YamlCompose, error) {
