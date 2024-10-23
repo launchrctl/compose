@@ -3,7 +3,7 @@ package compose
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
+	"github.com/launchrctl/launchr"
 )
 
 // EnumValue struct to hold enumeration.
@@ -34,7 +34,7 @@ func (e *EnumValue) String() string {
 }
 
 // EnumVarP adds custom enum flag to cobra command.
-func EnumVarP(cmd *cobra.Command, value *string, name, shorthand string, defaultValue string, enumValues []string, usage string) {
+func EnumVarP(cmd *launchr.Command, value *string, name, shorthand string, defaultValue string, enumValues []string, usage string) {
 	ev := &EnumValue{
 		Enum:         enumValues,
 		defaultValue: defaultValue,

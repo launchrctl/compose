@@ -10,7 +10,6 @@ import (
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
 	"github.com/launchrctl/launchr/pkg/action"
-	"github.com/spf13/cobra"
 
 	"github.com/launchrctl/compose/compose"
 )
@@ -30,7 +29,7 @@ func (p *Plugin) PluginInfo() launchr.PluginInfo {
 	return launchr.PluginInfo{Weight: 10}
 }
 
-// OnAppInit implements [launchr.Plugin] interface.
+// OnAppInit implements [launchr.OnAppInitPlugin] interface.
 func (p *Plugin) OnAppInit(app launchr.App) error {
 	app.GetService(&p.k)
 	p.wd = app.GetWD()
@@ -39,18 +38,18 @@ func (p *Plugin) OnAppInit(app launchr.App) error {
 	return nil
 }
 
-// CobraAddCommands implements launchr.CobraPlugin interface to provide compose functionality.
-func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
+// CobraAddCommands implements [launchr.CobraPlugin] interface to provide compose functionality.
+func (p *Plugin) CobraAddCommands(rootCmd *launchr.Command) error {
 	var workingDir string
 	var skipNotVersioned bool
 	var conflictsVerbosity bool
 	var clean bool
 	var interactive bool
 
-	var composeCmd = &cobra.Command{
+	var composeCmd = &launchr.Command{
 		Use:   "compose",
 		Short: "Composes filesystem (files & dirs)",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *launchr.Command, _ []string) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
 
@@ -82,13 +81,13 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	composeDependency := &compose.Dependency{}
 	strategies := &compose.RawStrategies{}
 	var createNew bool
-	var addCmd = &cobra.Command{
+	var addCmd = &launchr.Command{
 		Use:   "compose:add",
 		Short: "Add a new package to plasma-compose",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *launchr.Command, args []string) error {
 			return packagePreRunValidate(cmd, args)
 		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *launchr.Command, _ []string) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
 
@@ -96,13 +95,13 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 		},
 	}
 
-	var updateCmd = &cobra.Command{
+	var updateCmd = &launchr.Command{
 		Use:   "compose:update",
 		Short: "Update a plasma-compose package",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *launchr.Command, args []string) error {
 			return packagePreRunValidate(cmd, args)
 		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *launchr.Command, _ []string) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
 
@@ -115,10 +114,10 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	}
 
 	var toDeletePackages []string
-	var deleteCmd = &cobra.Command{
+	var deleteCmd = &launchr.Command{
 		Use:   "compose:delete",
 		Short: "Remove a package from plasma-compose",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *launchr.Command, _ []string) error {
 			// Don't show usage help on a runtime error.
 			cmd.SilenceUsage = true
 
@@ -140,7 +139,7 @@ func (p *Plugin) CobraAddCommands(rootCmd *cobra.Command) error {
 	return nil
 }
 
-func addPackageFlags(cmd *cobra.Command, dependency *compose.Dependency, strategies *compose.RawStrategies) {
+func addPackageFlags(cmd *launchr.Command, dependency *compose.Dependency, strategies *compose.RawStrategies) {
 	cmd.Flags().StringVarP(&dependency.Name, "package", "", "", "Name of the package")
 	compose.EnumVarP(cmd, &dependency.Source.Type, "type", "", compose.GitType, []string{compose.GitType, compose.HTTPType}, "Type of the package source: git, http")
 	cmd.Flags().StringVarP(&dependency.Source.Ref, "ref", "", "", "Reference of the package source")
@@ -151,7 +150,7 @@ func addPackageFlags(cmd *cobra.Command, dependency *compose.Dependency, strateg
 	cmd.Flags().StringSliceVarP(&strategies.Paths, "strategy-path", "", []string{}, "Strategy paths. paths separated by |, strategies are comma separated (path/1|path/2,path/1|path/2)")
 }
 
-func packagePreRunValidate(cmd *cobra.Command, _ []string) error {
+func packagePreRunValidate(cmd *launchr.Command, _ []string) error {
 	tagChanged := cmd.Flag("tag").Changed
 	refChanged := cmd.Flag("ref").Changed
 	if tagChanged && refChanged {
