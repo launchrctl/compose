@@ -46,6 +46,12 @@ func CreateComposer(pwd string, opts ComposerOptions, k keyring.Keyring) (*Compo
 		return nil, err
 	}
 
+	for _, dep := range config.Dependencies {
+		if dep.Source.Tag != "" {
+			launchr.Term().Warning().Printfln("found deprecated field `tag` in `%s` dependency. Use `ref` field for tags or branches.", dep.Name)
+		}
+	}
+
 	return &Composer{pwd, &opts, config, k}, nil
 }
 
