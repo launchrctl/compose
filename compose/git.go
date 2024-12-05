@@ -6,8 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
+
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -118,15 +119,6 @@ func (g *gitDownloader) EnsureLatest(pkg *Package, downloadPath string) (bool, e
 		return false, nil
 	}
 
-	emptyDir, err := IsEmptyDir(downloadPath)
-	if err != nil {
-		return false, err
-	}
-
-	if emptyDir {
-		return false, nil
-	}
-
 	r, err := git.PlainOpen(downloadPath)
 	if err != nil {
 		launchr.Log().Debug("git init error", "err", err)
@@ -136,7 +128,7 @@ func (g *gitDownloader) EnsureLatest(pkg *Package, downloadPath string) (bool, e
 	head, err := r.Head()
 	if err != nil {
 		launchr.Log().Debug("get head error", "err", err)
-		return false, fmt.Errorf("can't get HEAD of '%s', ensure package is valid", pkg.GetName())
+		return false, err
 	}
 
 	headName := head.Name().Short()

@@ -1,11 +1,8 @@
 package compose
 
 import (
-	"io"
 	"os"
 	"path/filepath"
-
-	"github.com/launchrctl/launchr"
 )
 
 const (
@@ -133,28 +130,5 @@ func downloadPackage(pkg *Package, targetDir string, kw *keyringWrapper) error {
 	}
 
 	err = downloader.Download(pkg, downloadPath)
-	if err != nil {
-		errRemove := os.RemoveAll(downloadPath)
-		if errRemove != nil {
-			launchr.Log().Debug("error cleaning package folder", "path", downloadPath, "err", err)
-		}
-	}
-
 	return err
-}
-
-// IsEmptyDir check if directory has at least 1 file.
-func IsEmptyDir(name string) (bool, error) {
-	f, err := os.Open(filepath.Clean(name))
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-
-	_, err = f.Readdirnames(1)
-	if err == io.EOF {
-		return true, nil
-	}
-
-	return false, err
 }
