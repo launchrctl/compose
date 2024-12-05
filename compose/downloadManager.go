@@ -8,14 +8,17 @@ import (
 const (
 	// GitType is const for GIT source type download.
 	GitType = "git"
+	// SourceReferenceTag represents git tag source.
+	SourceReferenceTag = "tag"
+	// SourceReferenceBranch represents git branch source.
+	SourceReferenceBranch = "ref"
 	// HTTPType is const for http source type download.
 	HTTPType = "http"
 )
 
 // Downloader interface
 type Downloader interface {
-	Download(pkg *Package, targetDir string) error
-	EnsureLatest(pkg *Package, downloadPath string) (bool, error)
+	Download(pkg *Package, targetDir string, kw *keyringWrapper) error
 }
 
 // DownloadManager struct, provides methods to fetch packages
@@ -32,14 +35,14 @@ func CreateDownloadManager(keyring *keyringWrapper) DownloadManager {
 	return DownloadManager{kw: keyring}
 }
 
-func getDownloaderForPackage(downloadType string, kw *keyringWrapper) Downloader {
+func getDownloaderForPackage(downloadType string) Downloader {
 	switch {
 	case downloadType == GitType:
-		return newGit(kw)
+		return newGit()
 	case downloadType == HTTPType:
-		return newHTTP(kw)
+		return newHTTP()
 	default:
-		return newGit(kw)
+		return newGit()
 	}
 }
 
@@ -82,13 +85,16 @@ func (m DownloadManager) recursiveDownload(yc *YamlCompose, kw *keyringWrapper, 
 
 		packagePath := filepath.Join(targetDir, pkg.GetName(), pkg.GetTarget())
 
-		err := downloadPackage(pkg, targetDir, kw)
-		if err != nil {
-			return packages, err
+		// Skip package download if it exists in packages dir.
+		if _, err := os.Stat(packagePath); os.IsNotExist(err) {
+			err = downloadPackage(pkg, targetDir, kw)
+			if err != nil {
+				return packages, err
+			}
 		}
 
 		// If package has plasma-compose.yaml, proceed with it
-		if _, err = os.Stat(filepath.Join(packagePath, composeFile)); !os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(packagePath, composeFile)); !os.IsNotExist(err) {
 			cfg, err := Lookup(os.DirFS(packagePath))
 			if err == nil {
 				packages, err = m.recursiveDownload(cfg, kw, packages, pkg, targetDir)
@@ -105,23 +111,13 @@ func (m DownloadManager) recursiveDownload(yc *YamlCompose, kw *keyringWrapper, 
 }
 
 func downloadPackage(pkg *Package, targetDir string, kw *keyringWrapper) error {
-	downloader := getDownloaderForPackage(pkg.GetType(), kw)
+	downloader := getDownloaderForPackage(pkg.GetType())
 	packagePath := filepath.Join(targetDir, pkg.GetName())
 	downloadPath := filepath.Join(packagePath, pkg.GetTarget())
 
-	isLatest, err := downloader.EnsureLatest(pkg, downloadPath)
-	if err != nil {
-		return err
-	}
-
-	if isLatest {
+	if _, err := os.Stat(downloadPath); !os.IsNotExist(err) {
+		// Skip package download if folder exists in packages dir.
 		return nil
-	}
-
-	// Ensure old package doesn't exist in case of update.
-	err = os.RemoveAll(downloadPath)
-	if err != nil {
-		return err
 	}
 
 	// temporary
@@ -129,6 +125,6 @@ func downloadPackage(pkg *Package, targetDir string, kw *keyringWrapper) error {
 		downloadPath = packagePath
 	}
 
-	err = downloader.Download(pkg, downloadPath)
+	err := downloader.Download(pkg, downloadPath, kw)
 	return err
 }

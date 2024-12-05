@@ -315,6 +315,7 @@ func processStrategiesForm(dependency *Dependency) error {
 }
 
 func preparePackageForm(dependency *Dependency, config *YamlCompose, isAdd bool) *huh.Form {
+	var refType string
 	uniqueLimit := 1
 	if isAdd {
 		uniqueLimit = 0
@@ -376,10 +377,26 @@ func preparePackageForm(dependency *Dependency, config *YamlCompose, isAdd bool)
 		),
 
 		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("- Select source reference").
+				Options(
+					huh.NewOption("Tag", SourceReferenceTag).Selected(true),
+					huh.NewOption("Branch", SourceReferenceBranch),
+				).
+				Value(&refType),
+		).WithHideFunc(func() bool { return dependency.Source.Type != GitType }),
+
+		huh.NewGroup(
+			huh.NewInput().
+				Title("- Enter Tag").
+				Value(&dependency.Source.Tag),
+		).WithHideFunc(func() bool { return dependency.Source.Type != GitType || refType != SourceReferenceTag }),
+
+		huh.NewGroup(
 			huh.NewInput().
 				Title("- Enter Ref").
 				Value(&dependency.Source.Ref),
-		).WithHideFunc(func() bool { return dependency.Source.Type != GitType }),
+		).WithHideFunc(func() bool { return dependency.Source.Type != GitType || refType != SourceReferenceBranch }),
 	)
 }
 
@@ -414,4 +431,5 @@ func sanitizeDependency(dependency *Dependency) {
 	dependency.Name = strings.TrimSpace(dependency.Name)
 	dependency.Source.URL = strings.TrimSpace(dependency.Source.URL)
 	dependency.Source.Ref = strings.TrimSpace(dependency.Source.Ref)
+	dependency.Source.Tag = strings.TrimSpace(dependency.Source.Tag)
 }

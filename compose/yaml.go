@@ -9,11 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const (
-	// TargetLatest is fallback to latest master branch.
-	TargetLatest = "latest"
-)
-
 var (
 	composePermissions uint32 = 0644
 )
@@ -92,26 +87,22 @@ func (p *Package) GetURL() string {
 
 // GetRef from package source
 func (p *Package) GetRef() string {
-	ref := p.Source.Ref
-	if ref == "" && p.GetTag() != "" {
-		ref = p.GetTag()
-	}
-
-	return ref
+	return p.Source.Ref
 }
 
-// GetTag from package source.
-// Deprecated: use [Package.GetRef]
+// GetTag from package source
 func (p *Package) GetTag() string {
 	return p.Source.Tag
 }
 
 // GetTarget returns a target version of package
 func (p *Package) GetTarget() string {
-	target := TargetLatest
-	ref := p.GetRef()
-	if ref != "" {
-		target = ref
+	target := "latest"
+
+	if p.GetRef() != "" {
+		target = p.GetRef()
+	} else if p.GetTag() != "" {
+		target = p.GetTag()
 	}
 
 	return target

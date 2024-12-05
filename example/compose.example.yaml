@@ -1,27 +1,34 @@
-name: example
+name: myproject
+version: 1.0.0
 dependencies:
   - name: package-1
     source:
       type: git
       url: https://github.com/example/compose-example.git
-      ref: "branch-name or tag-name"
-      strategy: null # In case of conflicting file, default strategy is that local file is selected and package file ignored when composing
+      # ref: branch-name
+      # tag: tag-name
+      strategy: null # In case of conflicting file, default strategy is that local file is selected and package file ignored when composing 
+
   - name: package-2
     source:
       type: git
       url: https://github.com/example/compose-example.git
-      #ref: "branch-name or tag-name"
+      # ref: branch-name
+      # tag: tag-name
       strategy:
         - name: overwrite-local-file # Works with files only.
           path: interaction/file-present-in-package-and-domain   < File from package will override file from domain
+
         - name: remove-extra-local-files
-          path:
+          path: 
             - interaction/extra-local-file.txt < File from domain will be excluded if it does not exists in package
             - interaction/extra-local-folder < Directory from domain will be excluded if it does not exists in package
+
         - name: ignore-extra-package-files
           path:
             - interaction/extra-package-file.txt < File from package will be excluded if it does not exists in domain
             - interaction/extra-package-folder < Directory from package will be excluded if it does not exists in domain
+
         - name: filter-package-files
           path:
             - interaction/filtered-package-file.txt < Only this file will be taken from package if it does not exists in domain
