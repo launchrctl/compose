@@ -1,0 +1,11 @@
+runtime: plugin
+action:
+  title: Compose delete
+  description: >-
+    Remove a package from plasma-compose
+  options:
+    - name: packages
+      title: Packages
+      description: List of packages to remove. Comma separated.
+      type: array
+      default: []

@@ -1,0 +1,33 @@
+runtime: plugin
+action:
+  title: Compose
+  description: >-
+    Composes filesystem (files & dirs)
+  options:
+    - name: working-dir
+      shorthand: w
+      title: Working directory
+      description: Working directory for temp files
+      type: string
+      default: .compose/packages
+    - name: skip-not-versioned
+      shorthand: s
+      title: Skip unversioned
+      description: Skip not versioned files from source directory (git only)
+      type: boolean
+      default: false
+    - name: conflicts-verbosity
+      title: Conflicts verbosity
+      description: Log files conflicts
+      type: boolean
+      default: false
+    - name: clean
+      title: Timeout
+      description: Remove .compose dir on start
+      type: boolean
+      default: false
+    - name: interactive
+      title: Interactive
+      description: Interactive mode allows to submit user credentials during action
+      type: boolean
+      default: true
