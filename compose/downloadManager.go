@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ const (
 
 // Downloader interface
 type Downloader interface {
-	Download(pkg *Package, targetDir string) error
+	Download(ctx context.Context, pkg *Package, targetDir string) error
 	EnsureLatest(pkg *Package, downloadPath string) (bool, error)
 }
 
@@ -47,7 +48,7 @@ func getDownloaderForPackage(downloadType string, kw *keyringWrapper) Downloader
 }
 
 // Download packages using compose file
-func (m DownloadManager) Download(c *YamlCompose, targetDir string) ([]*Package, error) {
+func (m DownloadManager) Download(ctx context.Context, c *YamlCompose, targetDir string) ([]*Package, error) {
 	var packages []*Package
 	//credentials := []keyring.CredentialsItem{}
 	err := EnsureDirExists(targetDir)
@@ -56,7 +57,7 @@ func (m DownloadManager) Download(c *YamlCompose, targetDir string) ([]*Package,
 	}
 
 	kw := m.getKeyring()
-	packages, err = m.recursiveDownload(c, kw, packages, nil, targetDir)
+	packages, err = m.recursiveDownload(ctx, c, kw, packages, nil, targetDir)
 	if err != nil {
 		return packages, err
 	}
@@ -69,7 +70,7 @@ func (m DownloadManager) Download(c *YamlCompose, targetDir string) ([]*Package,
 	return packages, err
 }
 
-func (m DownloadManager) recursiveDownload(yc *YamlCompose, kw *keyringWrapper, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
+func (m DownloadManager) recursiveDownload(ctx context.Context, yc *YamlCompose, kw *keyringWrapper, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
 	for _, d := range yc.Dependencies {
 		// build package from dependency struct
 		// add dependency if parent exists
@@ -85,7 +86,7 @@ func (m DownloadManager) recursiveDownload(yc *YamlCompose, kw *keyringWrapper, 
 
 		packagePath := filepath.Join(targetDir, pkg.GetName(), pkg.GetTarget())
 
-		err := downloadPackage(pkg, targetDir, kw)
+		err := downloadPackage(ctx, pkg, targetDir, kw)
 		if err != nil {
 			return packages, err
 		}
@@ -94,7 +95,7 @@ func (m DownloadManager) recursiveDownload(yc *YamlCompose, kw *keyringWrapper, 
 		if _, err = os.Stat(filepath.Join(packagePath, composeFile)); !os.IsNotExist(err) {
 			cfg, err := Lookup(os.DirFS(packagePath))
 			if err == nil {
-				packages, err = m.recursiveDownload(cfg, kw, packages, pkg, targetDir)
+				packages, err = m.recursiveDownload(ctx, cfg, kw, packages, pkg, targetDir)
 				if err != nil {
 					return packages, err
 				}
@@ -107,7 +108,7 @@ func (m DownloadManager) recursiveDownload(yc *YamlCompose, kw *keyringWrapper, 
 	return packages, nil
 }
 
-func downloadPackage(pkg *Package, targetDir string, kw *keyringWrapper) error {
+func downloadPackage(ctx context.Context, pkg *Package, targetDir string, kw *keyringWrapper) error {
 	downloader := getDownloaderForPackage(pkg.GetType(), kw)
 	packagePath := filepath.Join(targetDir, pkg.GetName())
 	downloadPath := filepath.Join(packagePath, pkg.GetTarget())
@@ -132,7 +133,7 @@ func downloadPackage(pkg *Package, targetDir string, kw *keyringWrapper) error {
 		downloadPath = packagePath
 	}
 
-	err = downloader.Download(pkg, downloadPath)
+	err = downloader.Download(ctx, pkg, downloadPath)
 	if err != nil {
 		errRemove := os.RemoveAll(downloadPath)
 		if errRemove != nil {
@@ -156,5 +157,19 @@ func IsEmptyDir(name string) (bool, error) {
 		return true, nil
 	}
 
+	// Check if .git exists and nothing else
+	gitPath := filepath.Join(name, ".git")
+	if _, err = os.Stat(gitPath); err == nil {
+		// .git exists, now check if it's the only entry
+		entries, err := f.Readdirnames(2) // Read at most 2 entries
+		if err != nil {
+			return false, err
+		}
+		if len(entries) == 1 && entries[0] == ".git" {
+			return true, nil
+		}
+	}
+
+	// Directory is not empty
 	return false, err
 }

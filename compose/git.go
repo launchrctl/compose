@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -241,7 +242,7 @@ func (g *gitDownloader) ensureLatestTag(r *git.Repository, fetchURL, refName str
 }
 
 // Download implements Downloader.Download interface
-func (g *gitDownloader) Download(pkg *Package, targetDir string) error {
+func (g *gitDownloader) Download(ctx context.Context, pkg *Package, targetDir string) error {
 	launchr.Term().Printfln("git fetch: %s", pkg.GetURL())
 
 	url := pkg.GetURL()
@@ -252,7 +253,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string) error {
 	ref := pkg.GetRef()
 	if ref == "" {
 		// Try to clone latest master branch.
-		err := g.tryDownload(targetDir, g.buildOptions(url))
+		err := g.tryDownload(ctx, targetDir, g.buildOptions(url))
 		if err != nil {
 			return err
 		}
@@ -268,7 +269,7 @@ func (g *gitDownloader) Download(pkg *Package, targetDir string) error {
 		options := g.buildOptions(url)
 		options.ReferenceName = r
 
-		err := g.tryDownload(targetDir, options)
+		err := g.tryDownload(ctx, targetDir, options)
 		if err != nil {
 			noMatchError := git.NoMatchingRefSpecError{}
 			if errors.Is(err, noMatchError) {
@@ -297,12 +298,13 @@ func (g *gitDownloader) buildOptions(url string) *git.CloneOptions {
 	}
 }
 
-func (g *gitDownloader) tryDownload(targetDir string, options *git.CloneOptions) error {
+func (g *gitDownloader) tryDownload(ctx context.Context, targetDir string, options *git.CloneOptions) error {
 	url := options.URL
 	auths := []authorizationMode{authorisationNone, authorisationKeyring, authorisationManual}
 	for _, authType := range auths {
 		if authType == authorisationNone {
-			_, err := git.PlainClone(targetDir, false, options)
+			_, err := git.PlainCloneContext(ctx, targetDir, false, options)
+			launchr.Term().Println("")
 			if err != nil {
 				if errors.Is(err, transport.ErrAuthenticationRequired) {
 					launchr.Term().Println("auth required, trying keyring authorisation")
@@ -324,7 +326,7 @@ func (g *gitDownloader) tryDownload(targetDir string, options *git.CloneOptions)
 				Password: ci.Password,
 			}
 
-			_, err = git.PlainClone(targetDir, false, options)
+			_, err = git.PlainCloneContext(ctx, targetDir, false, options)
 			if err != nil {
 				if errors.Is(err, transport.ErrAuthorizationFailed) || errors.Is(err, transport.ErrAuthenticationRequired) {
 					if g.k.interactive {
@@ -350,7 +352,7 @@ func (g *gitDownloader) tryDownload(targetDir string, options *git.CloneOptions)
 				Password: ci.Password,
 			}
 
-			_, err = git.PlainClone(targetDir, false, options)
+			_, err = git.PlainCloneContext(ctx, targetDir, false, options)
 			if err != nil {
 				return err
 			}

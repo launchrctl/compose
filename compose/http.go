@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -51,7 +52,7 @@ func (h *httpDownloader) EnsureLatest(_ *Package, downloadPath string) (bool, er
 }
 
 // Download implements Downloader.Download interface
-func (h *httpDownloader) Download(pkg *Package, targetDir string) error {
+func (h *httpDownloader) Download(_ context.Context, pkg *Package, targetDir string) error {
 	url := pkg.GetURL()
 	name := rgxNameFromURL.FindString(url)
 	if name == "" {

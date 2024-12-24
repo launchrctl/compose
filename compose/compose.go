@@ -2,9 +2,12 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/launchrctl/keyring"
 	"github.com/launchrctl/launchr"
@@ -107,30 +110,49 @@ func (kw *keyringWrapper) fillCredentials(ci keyring.CredentialsItem) (keyring.C
 
 // RunInstall on Composer
 func (c *Composer) RunInstall() error {
-	buildDir, packagesDir, err := c.prepareInstall()
-	if err != nil {
-		return err
-	}
+	ctx, cancel := context.WithCancel(context.Background())
 
-	kw := &keyringWrapper{keyringService: c.getKeyring(), shouldUpdate: false, interactive: c.options.Interactive}
-	dm := CreateDownloadManager(kw)
-	packages, err := dm.Download(c.getCompose(), packagesDir)
-	if err != nil {
-		return err
-	}
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 
-	builder := createBuilder(
-		c.pwd,
-		buildDir,
-		packagesDir,
-		c.options.SkipNotVersioned,
-		c.options.ConflictsVerbosity,
-		packages,
-	)
-	return builder.build()
+	go func() {
+		<-signalChan
+		launchr.Term().Printfln("\nTermination signal received. Cleaning up...")
+		// cleanup dir
+		_, _, _ = c.prepareInstall(false)
+
+		cancel()
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		buildDir, packagesDir, err := c.prepareInstall(c.options.Clean)
+		if err != nil {
+			return err
+		}
+
+		kw := &keyringWrapper{keyringService: c.getKeyring(), shouldUpdate: false, interactive: c.options.Interactive}
+		dm := CreateDownloadManager(kw)
+		packages, err := dm.Download(ctx, c.getCompose(), packagesDir)
+		if err != nil {
+			return err
+		}
+
+		builder := createBuilder(
+			c.pwd,
+			buildDir,
+			packagesDir,
+			c.options.SkipNotVersioned,
+			c.options.ConflictsVerbosity,
+			packages,
+		)
+		return builder.build(ctx)
+	}
 }
 
-func (c *Composer) prepareInstall() (string, string, error) {
+func (c *Composer) prepareInstall(clean bool) (string, string, error) {
 	buildPath := c.getPath(BuildDir)
 	packagesPath := c.getPath(c.options.WorkingDir)
 
@@ -140,7 +162,7 @@ func (c *Composer) prepareInstall() (string, string, error) {
 		return "", "", err
 	}
 
-	if c.options.Clean {
+	if clean {
 		launchr.Term().Printfln("Cleaning packages dir: %s", packagesPath)
 		err = os.RemoveAll(packagesPath)
 		if err != nil {
