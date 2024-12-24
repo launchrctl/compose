@@ -22,7 +22,7 @@ action:
       type: boolean
       default: false
     - name: clean
-      title: Timeout
+      title: Clean
       description: Remove .compose dir on start
       type: boolean
       default: false
