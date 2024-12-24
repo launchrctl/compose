@@ -19,7 +19,7 @@ import (
 
 var (
 	errInvalidFilepath        = errors.New("invalid filepath")
-	errNoURL                  = errors.New("invalid url")
+	errNoURL                  = errors.New("invalid package url")
 	errFailedClose            = errors.New("failed to close stream")
 	errRepositoryNotFound     = errors.New("repository not found")
 	errAuthenticationRequired = errors.New("authentication required")
@@ -33,14 +33,25 @@ var (
 	rgxPathRoot    = regexp.MustCompile(`^[^\/]*`)
 )
 
-type httpDownloader struct{}
+type httpDownloader struct {
+	k *keyringWrapper
+}
 
-func newHTTP() Downloader {
-	return &httpDownloader{}
+func newHTTP(kw *keyringWrapper) Downloader {
+	return &httpDownloader{k: kw}
+}
+
+func (h *httpDownloader) EnsureLatest(_ *Package, downloadPath string) (bool, error) {
+	if _, err := os.Stat(downloadPath); !os.IsNotExist(err) {
+		// Skip download if package exists.
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // Download implements Downloader.Download interface
-func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWrapper) error {
+func (h *httpDownloader) Download(pkg *Package, targetDir string) error {
 	url := pkg.GetURL()
 	name := rgxNameFromURL.FindString(url)
 	if name == "" {
@@ -92,7 +103,7 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWra
 		}
 
 		if authType == authorisationKeyring {
-			ci, errGet := kw.getForURL(url)
+			ci, errGet := h.k.getForURL(url)
 			if errGet != nil {
 				return errGet
 			}
@@ -101,7 +112,7 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWra
 			resp, err = doRequest(client, req)
 			if err != nil {
 				if errors.Is(err, errAuthorizationFailed) {
-					if kw.interactive {
+					if h.k.interactive {
 						launchr.Term().Println("invalid auth, trying manual authorisation")
 						continue
 					}
@@ -115,7 +126,7 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWra
 		if authType == authorisationManual {
 			ci := keyring.CredentialsItem{}
 			ci.URL = url
-			ci, errFill := kw.fillCredentials(ci)
+			ci, errFill := h.k.fillCredentials(ci)
 			if errFill != nil {
 				return errFill
 			}
@@ -157,6 +168,8 @@ func (h *httpDownloader) Download(pkg *Package, targetDir string, kw *keyringWra
 	}
 
 	if archiveRootDir != "" {
+		defer os.Remove(fpath)
+
 		// rename root folder to package name
 		return os.Rename(
 			filepath.Join(targetDir, archiveRootDir),
