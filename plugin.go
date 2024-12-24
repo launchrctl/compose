@@ -143,7 +143,6 @@ func addPackageFlags(cmd *launchr.Command, dependency *compose.Dependency, strat
 	cmd.Flags().StringVarP(&dependency.Name, "package", "", "", "Name of the package")
 	compose.EnumVarP(cmd, &dependency.Source.Type, "type", "", compose.GitType, []string{compose.GitType, compose.HTTPType}, "Type of the package source: git, http")
 	cmd.Flags().StringVarP(&dependency.Source.Ref, "ref", "", "", "Reference of the package source")
-	cmd.Flags().StringVarP(&dependency.Source.Tag, "tag", "", "", "Tag of the package source")
 	cmd.Flags().StringVarP(&dependency.Source.URL, "url", "", "", "URL of the package source")
 
 	cmd.Flags().StringSliceVarP(&strategies.Names, "strategy", "", []string{}, "Strategy name")
@@ -151,23 +150,13 @@ func addPackageFlags(cmd *launchr.Command, dependency *compose.Dependency, strat
 }
 
 func packagePreRunValidate(cmd *launchr.Command, _ []string) error {
-	tagChanged := cmd.Flag("tag").Changed
-	refChanged := cmd.Flag("ref").Changed
-	if tagChanged && refChanged {
-		return errors.New("tag and ref cannot be used at the same time")
-	}
-
 	typeFlag, err := cmd.Flags().GetString("type")
 	if err != nil {
 		return err
 	}
 
 	if typeFlag == compose.HTTPType {
-		if tagChanged {
-			launchr.Term().Warning().Println("Tag can't be used with HTTP source")
-			err = cmd.Flags().Set("tag", "")
-		}
-		if refChanged {
+		if cmd.Flag("ref").Changed {
 			launchr.Term().Warning().Println("Ref can't be used with HTTP source")
 			err = cmd.Flags().Set("ref", "")
 		}

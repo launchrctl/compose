@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -150,7 +151,7 @@ func getVersionedMap(gitDir string) (map[string]bool, error) {
 	return versionedFiles, err
 }
 
-func (b *Builder) build() error {
+func (b *Builder) build(ctx context.Context) error {
 	launchr.Term().Println("Creating composition...")
 	err := EnsureDirExists(b.targetDir)
 	if err != nil {
@@ -174,43 +175,48 @@ func (b *Builder) build() error {
 
 	// @todo move to function
 	err = fs.WalkDir(baseFs, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if err != nil {
+				return err
+			}
 
-		root := rgxPathRoot.FindString(path)
-		if _, ok := excludedFolders[root]; ok {
-			return nil
-		}
-
-		if !d.IsDir() {
-			filename := filepath.Base(path)
-			if _, ok := excludedFiles[filename]; ok {
+			root := rgxPathRoot.FindString(path)
+			if _, ok := excludedFolders[root]; ok {
 				return nil
 			}
-		}
 
-		// Apply strategies that target local files
-		for _, localStrategy := range ls {
-			if localStrategy.s == removeExtraLocalFiles {
-				if ensureStrategyPrefixPath(path, localStrategy.paths) {
+			if !d.IsDir() {
+				filename := filepath.Base(path)
+				if _, ok := excludedFiles[filename]; ok {
 					return nil
 				}
 			}
-		}
 
-		// Add .git folder into entriesTree whenever CheckVersioned or not
-		if checkVersioned && !strings.HasPrefix(path, gitPrefix) {
-			if _, ok := versionedMap[path]; !ok {
-				return nil
+			// Apply strategies that target local files
+			for _, localStrategy := range ls {
+				if localStrategy.s == removeExtraLocalFiles {
+					if ensureStrategyPrefixPath(path, localStrategy.paths) {
+						return nil
+					}
+				}
 			}
-		}
 
-		finfo, _ := d.Info()
-		entry := &fsEntry{Prefix: b.platformDir, Path: path, Entry: finfo, Excluded: false, From: "domain repo"}
-		entriesTree = append(entriesTree, entry)
-		entriesMap[path] = entry
-		return nil
+			// Add .git folder into entriesTree whenever CheckVersioned or not
+			if checkVersioned && !strings.HasPrefix(path, gitPrefix) {
+				if _, ok := versionedMap[path]; !ok {
+					return nil
+				}
+			}
+
+			finfo, _ := d.Info()
+			entry := &fsEntry{Prefix: b.platformDir, Path: path, Entry: finfo, Excluded: false, From: "domain repo"}
+			entriesTree = append(entriesTree, entry)
+			entriesMap[path] = entry
+			return nil
+		}
 	})
 
 	if err != nil {
@@ -226,72 +232,82 @@ func (b *Builder) build() error {
 	}
 
 	for i := 0; i < len(items); i++ {
-		pkgName := items[i]
-		if pkgName != DependencyRoot {
-			pkgPath := filepath.Join(b.sourceDir, pkgName, targetsMap[pkgName])
-			packageFs := os.DirFS(pkgPath)
-			strategies, ok := ps[pkgName]
-			err = fs.WalkDir(packageFs, ".", func(path string, d fs.DirEntry, err error) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			pkgName := items[i]
+			if pkgName != DependencyRoot {
+				pkgPath := filepath.Join(b.sourceDir, pkgName, targetsMap[pkgName])
+				packageFs := os.DirFS(pkgPath)
+				strategies, ok := ps[pkgName]
+				err = fs.WalkDir(packageFs, ".", func(path string, d fs.DirEntry, err error) error {
+					if err != nil {
+						return err
+					}
+
+					// Skip .git folder from packages
+					if strings.HasPrefix(path, gitPrefix) {
+						return nil
+					}
+
+					var conflictReslv mergeConflictResolve
+					finfo, _ := d.Info()
+					entry := &fsEntry{Prefix: pkgPath, Path: path, Entry: finfo, Excluded: false, From: pkgName}
+
+					if !ok {
+						// No strategies for package. Proceed with default merge.
+						entriesTree, conflictReslv = addEntries(entriesTree, entriesMap, entry, path)
+					} else {
+						entriesTree, conflictReslv = addStrategyEntries(strategies, entriesTree, entriesMap, entry, path)
+					}
+
+					if b.logConflicts && !finfo.IsDir() {
+						logConflictResolve(conflictReslv, path, pkgName, entriesMap[path])
+					}
+
+					return nil
+				})
+
 				if err != nil {
 					return err
 				}
-
-				// Skip .git folder from packages
-				if strings.HasPrefix(path, gitPrefix) {
-					return nil
-				}
-
-				var conflictReslv mergeConflictResolve
-				finfo, _ := d.Info()
-				entry := &fsEntry{Prefix: pkgPath, Path: path, Entry: finfo, Excluded: false, From: pkgName}
-
-				if !ok {
-					// No strategies for package. Proceed with default merge.
-					entriesTree, conflictReslv = addEntries(entriesTree, entriesMap, entry, path)
-				} else {
-					entriesTree, conflictReslv = addStrategyEntries(strategies, entriesTree, entriesMap, entry, path)
-				}
-
-				if b.logConflicts && !finfo.IsDir() {
-					logConflictResolve(conflictReslv, path, pkgName, entriesMap[path])
-				}
-
-				return nil
-			})
-
-			if err != nil {
-				return err
 			}
 		}
 	}
 
 	// @todo check rsync
 	for _, treeItem := range entriesTree {
-		sourcePath := filepath.Join(treeItem.Prefix, treeItem.Path)
-		destPath := filepath.Join(b.targetDir, treeItem.Path)
-		isSymlink := false
-		permissions := os.FileMode(dirPermissions)
-
-		switch treeItem.Entry.Mode() & os.ModeType {
-		case os.ModeDir:
-			if err := createDir(destPath, treeItem.Entry.Mode()); err != nil {
-				return err
-			}
-		case os.ModeSymlink:
-			if err := lcopy(sourcePath, destPath); err != nil {
-				return err
-			}
-			isSymlink = true
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
 		default:
-			permissions = treeItem.Entry.Mode()
-			if err := fcopy(sourcePath, destPath); err != nil {
-				return err
-			}
-		}
+			sourcePath := filepath.Join(treeItem.Prefix, treeItem.Path)
+			destPath := filepath.Join(b.targetDir, treeItem.Path)
+			isSymlink := false
+			permissions := os.FileMode(dirPermissions)
 
-		if !isSymlink {
-			if err := os.Chmod(destPath, permissions); err != nil {
-				return err
+			switch treeItem.Entry.Mode() & os.ModeType {
+			case os.ModeDir:
+				if err := createDir(destPath, treeItem.Entry.Mode()); err != nil {
+					return err
+				}
+			case os.ModeSymlink:
+				if err := lcopy(sourcePath, destPath); err != nil {
+					return err
+				}
+				isSymlink = true
+			default:
+				permissions = treeItem.Entry.Mode()
+				if err := fcopy(sourcePath, destPath); err != nil {
+					return err
+				}
+			}
+
+			if !isSymlink {
+				if err := os.Chmod(destPath, permissions); err != nil {
+					return err
+				}
 			}
 		}
 	}
