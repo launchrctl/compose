@@ -72,37 +72,42 @@ func (m DownloadManager) Download(ctx context.Context, c *YamlCompose, targetDir
 
 func (m DownloadManager) recursiveDownload(ctx context.Context, yc *YamlCompose, kw *keyringWrapper, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
 	for _, d := range yc.Dependencies {
-		// build package from dependency struct
-		// add dependency if parent exists
-		pkg := d.ToPackage(d.Name)
-		if parent != nil {
-			parent.AddDependency(d.Name)
-		}
+		select {
+		case <-ctx.Done():
+			return packages, ctx.Err()
+		default:
+			// build package from dependency struct
+			// add dependency if parent exists
+			pkg := d.ToPackage(d.Name)
+			if parent != nil {
+				parent.AddDependency(d.Name)
+			}
 
-		url := pkg.GetURL()
-		if url == "" {
-			return packages, errNoURL
-		}
+			url := pkg.GetURL()
+			if url == "" {
+				return packages, errNoURL
+			}
 
-		packagePath := filepath.Join(targetDir, pkg.GetName(), pkg.GetTarget())
+			packagePath := filepath.Join(targetDir, pkg.GetName(), pkg.GetTarget())
 
-		err := downloadPackage(ctx, pkg, targetDir, kw)
-		if err != nil {
-			return packages, err
-		}
+			err := downloadPackage(ctx, pkg, targetDir, kw)
+			if err != nil {
+				return packages, err
+			}
 
-		// If package has plasma-compose.yaml, proceed with it
-		if _, err = os.Stat(filepath.Join(packagePath, composeFile)); !os.IsNotExist(err) {
-			cfg, err := Lookup(os.DirFS(packagePath))
-			if err == nil {
-				packages, err = m.recursiveDownload(ctx, cfg, kw, packages, pkg, targetDir)
-				if err != nil {
-					return packages, err
+			// If package has plasma-compose.yaml, proceed with it
+			if _, err = os.Stat(filepath.Join(packagePath, composeFile)); !os.IsNotExist(err) {
+				cfg, err := Lookup(os.DirFS(packagePath))
+				if err == nil {
+					packages, err = m.recursiveDownload(ctx, cfg, kw, packages, pkg, targetDir)
+					if err != nil {
+						return packages, err
+					}
 				}
 			}
-		}
 
-		packages = append(packages, pkg)
+			packages = append(packages, pkg)
+		}
 	}
 
 	return packages, nil
