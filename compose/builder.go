@@ -58,7 +58,24 @@ var (
 	StrategyFilterPackage = "filter-package-files"
 )
 
-// return conflict const (0 - no warning, 1 - conflict with local, 2 conflict with pacakge)
+// return conflict const (0 - no warning, 1 - conflict with local, 2 conflict with package)
+
+func cleanStrategyPaths(paths []string) []string {
+	// remove trailing separators and add only one separator at the end.
+	// so prefix won't be greedy during comparison.
+	var r []string
+
+	for _, p := range paths {
+		path := filepath.Clean(p)
+		if !strings.HasSuffix(path, string(os.PathSeparator)) {
+			path += string(os.PathSeparator)
+		}
+
+		r = append(r, path)
+	}
+
+	return r
+}
 
 func retrieveStrategies(packages []*Package) ([]*mergeStrategy, map[string][]*mergeStrategy) {
 	var ls []*mergeStrategy
@@ -70,7 +87,7 @@ func retrieveStrategies(packages []*Package) ([]*mergeStrategy, map[string][]*me
 			if s == undefinedStrategy {
 				continue
 			}
-			strategy := &mergeStrategy{s, t, item.Paths}
+			strategy := &mergeStrategy{s, t, cleanStrategyPaths(item.Paths)}
 
 			if t == localStrategy {
 				ls = append(ls, strategy)
