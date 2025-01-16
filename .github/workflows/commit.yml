@@ -6,7 +6,7 @@ on:
 
 jobs:
   no-tty-in-ci:
-    name: Ensure login command does not requires TTY if all options are passed
+    name: Ensure keyring:login command does not requires TTY if all options are passed
     runs-on: ubuntu-latest
 
     steps:
@@ -21,7 +21,7 @@ jobs:
           whoami
           make deps build
           ls -lah bin/launchr
-          ./bin/launchr login --url=http://***.git --username="***" --password="***" --keyring-passphrase="***"
+          ./bin/launchr keyring:login --url=http://***.git --username="***" --password="***" --keyring-passphrase="***"
 
   private-repo:
     name: Ensure composition with private repo do not fail
@@ -54,7 +54,7 @@ jobs:
                 strategy: null
           EOF
           cat plasma-compose.yaml
-          ./bin/launchr login --url=https://github.com/davidferlay/compose-example.git --username="${EXAMPLE_REPO_USERNAME}" --password="${EXAMPLE_REPO_PASSWORD}" --keyring-passphrase="${KEYRING_PASSWORD}"
+          ./bin/launchr keyring:login --url=https://github.com/davidferlay/compose-example.git --username="${EXAMPLE_REPO_USERNAME}" --password="${EXAMPLE_REPO_PASSWORD}" --keyring-passphrase="${KEYRING_PASSWORD}"
           ./bin/launchr compose --keyring-passphrase "${KEYRING_PASSWORD}" --skip-not-versioned --conflicts-verbosity --clean
           ls -lah .compose/build | grep -i FILE_FROM_EXAMPLE
 
