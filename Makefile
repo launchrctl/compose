@@ -3,7 +3,7 @@ FIRST_GOPATH:=$(firstword $(subst :, ,$(GOPATH)))
 
 # Build available information.
 GIT_HASH:=$(shell git log --format="%h" -n 1 2> /dev/null)
-RAW_GIT_BRANCH := $(if $(GITHUB_REF_NAME),$(GITHUB_REF_NAME),$(shell git branch 2> /dev/null | grep '*' | cut -f2 -d' '))
+RAW_GIT_BRANCH := $(if $(GITHUB_REF_NAME),$(GITHUB_REF_NAME),$(shell git rev-parse --abbrev-ref HEAD))
 GIT_BRANCH = $(shell echo $(RAW_GIT_BRANCH) | sed 's/[^a-zA-Z0-9-]//g')
 APP_VERSION:="$(GIT_BRANCH)-$(GIT_HASH)"
 GOPKG:=github.com/launchrctl/launchr

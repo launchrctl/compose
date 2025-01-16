@@ -1,0 +1,43 @@
+runtime: plugin
+action:
+  title: Compose update
+  description: >-
+    Update a plasma-compose package
+  options:
+    - name: package
+      title: Name
+      description: Name of the package
+      type: string
+      default: ""
+    - name: type
+      title: Type
+      description: "Type of the package source: git, http"
+      type: string
+      enum: [git, http]
+      default: git
+    - name: ref
+      title: Ref
+      description: Reference of the package source
+      type: string
+      default: ""
+    - name: tag
+      title: Tag
+      description: Tag of the package source
+      type: string
+      default: ""
+    - name: url
+      title: URL
+      description: URL of the package source
+      type: string
+      default: ""
+    - name: strategy
+      title: Strategy
+      description: Strategy name
+      type: array
+      default: []
+    - name: strategy-path
+      title: Strategy path
+      description: >-
+        Strategy paths. paths separated by |, strategies are comma separated (path/1|path/2,path/1|path/2)
+      type: array
+      default: []
