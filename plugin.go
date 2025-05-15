@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 
 	"github.com/launchrctl/keyring"
-
 	"github.com/launchrctl/launchr"
 	"github.com/launchrctl/launchr/pkg/action"
 
@@ -58,6 +57,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	composeAction := action.NewFromYAML("compose", actionComposeYaml)
 	composeAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, a *action.Action) error {
 		input := a.Input()
+		log, term := getLogger(a)
 		c, err := compose.CreateComposer(
 			p.wd,
 			compose.ComposerOptions{
@@ -69,6 +69,9 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 			},
 			p.k,
 		)
+		c.SetLogger(log)
+		c.SetTerm(term)
+
 		if err != nil {
 			return err
 		}
@@ -86,7 +89,9 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		createNew := input.Opt("allow-create").(bool)
 		composeDependency := getInputDependencies(input)
 		strategies := getInputStrategies(input)
-		return compose.AddPackage(createNew, composeDependency, strategies, p.wd)
+
+		fa := prepareFormsAction(a)
+		return fa.AddPackage(createNew, composeDependency, strategies, p.wd)
 	}))
 
 	// Action compose:update.
@@ -98,11 +103,13 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		}
 		composeDependency := getInputDependencies(input)
 		strategies := getInputStrategies(input)
+
+		fa := prepareFormsAction(a)
 		if composeDependency.Name != "" {
-			return compose.UpdatePackage(composeDependency, strategies, p.wd)
+			return fa.UpdatePackage(composeDependency, strategies, p.wd)
 		}
 
-		return compose.UpdatePackages(p.wd)
+		return fa.UpdatePackages(p.wd)
 	}))
 
 	// Action compose:delete.
@@ -110,7 +117,8 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	deleteAction.SetRuntime(action.NewFnRuntime(func(_ context.Context, a *action.Action) error {
 		input := a.Input()
 		toDeletePackages := action.InputOptSlice[string](input, "packages")
-		return compose.DeletePackages(toDeletePackages, p.wd)
+		fa := prepareFormsAction(a)
+		return fa.DeletePackages(toDeletePackages, p.wd)
 	}))
 
 	return []*action.Action{
@@ -119,6 +127,29 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 		updateAction,
 		deleteAction,
 	}, nil
+}
+
+func prepareFormsAction(a *action.Action) *compose.FormsAction {
+	log, term := getLogger(a)
+	fa := &compose.FormsAction{}
+	fa.SetLogger(log)
+	fa.SetTerm(term)
+
+	return fa
+}
+
+func getLogger(a *action.Action) (*launchr.Logger, *launchr.Terminal) {
+	log := launchr.Log()
+	if rt, ok := a.Runtime().(action.RuntimeLoggerAware); ok {
+		log = rt.LogWith()
+	}
+
+	term := launchr.Term()
+	if rt, ok := a.Runtime().(action.RuntimeTermAware); ok {
+		term = rt.Term()
+	}
+
+	return log, term
 }
 
 func getInputDependencies(input *action.Input) *compose.Dependency {
@@ -146,7 +177,6 @@ func packagePreRunValidate(input *action.Input) error {
 	if typeFlag == compose.HTTPType {
 		refChanged := input.Opt("ref").(string) != ""
 		if refChanged {
-			launchr.Term().Warning().Println("Ref can't be used with HTTP source")
 			input.SetOpt("ref", "")
 		}
 	}

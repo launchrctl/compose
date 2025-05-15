@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/launchrctl/launchr"
+	"github.com/launchrctl/launchr/pkg/action"
 	"github.com/stevenle/topsort"
 )
 
@@ -122,6 +122,9 @@ func identifyStrategy(name string) (mergeStrategyType, mergeStrategyTarget) {
 
 // Builder struct, provides methods to merge packages into build
 type Builder struct {
+	action.WithLogger
+	action.WithTerm
+
 	platformDir      string
 	targetDir        string
 	sourceDir        string
@@ -138,8 +141,17 @@ type fsEntry struct {
 	From     string
 }
 
-func createBuilder(platformDir, targetDir, sourceDir string, skipNotVersioned, logConflicts bool, packages []*Package) *Builder {
-	return &Builder{platformDir, targetDir, sourceDir, skipNotVersioned, logConflicts, packages}
+func createBuilder(c *Composer, targetDir, sourceDir string, packages []*Package) *Builder {
+	return &Builder{
+		c.WithLogger,
+		c.WithTerm,
+		c.pwd,
+		targetDir,
+		sourceDir,
+		c.options.SkipNotVersioned,
+		c.options.ConflictsVerbosity,
+		packages,
+	}
 }
 
 func getVersionedMap(gitDir string) (map[string]bool, error) {
@@ -169,7 +181,7 @@ func getVersionedMap(gitDir string) (map[string]bool, error) {
 }
 
 func (b *Builder) build(ctx context.Context) error {
-	launchr.Term().Println("Creating composition...")
+	b.Term().Println("Creating composition...")
 	err := EnsureDirExists(b.targetDir)
 	if err != nil {
 		return err
@@ -245,7 +257,7 @@ func (b *Builder) build(ctx context.Context) error {
 	targetsMap := getTargetsMap(b.packages)
 
 	if b.logConflicts {
-		launchr.Term().Info().Printf("Conflicting files:\n")
+		b.Term().Info().Printf("Conflicting files:\n")
 	}
 
 	for i := 0; i < len(items); i++ {
@@ -280,7 +292,7 @@ func (b *Builder) build(ctx context.Context) error {
 					}
 
 					if b.logConflicts && !finfo.IsDir() {
-						logConflictResolve(conflictReslv, path, pkgName, entriesMap[path])
+						b.logConflictResolve(conflictReslv, path, pkgName, entriesMap[path])
 					}
 
 					return nil
@@ -332,6 +344,14 @@ func (b *Builder) build(ctx context.Context) error {
 	return nil
 }
 
+func (b *Builder) logConflictResolve(resolveto mergeConflictResolve, path, pkgName string, entry *fsEntry) {
+	if resolveto == noConflict {
+		return
+	}
+
+	b.Term().Info().Printfln("[%s] - %s > Selected from %s", pkgName, path, entry.From)
+}
+
 func getTargetsMap(packages []*Package) map[string]string {
 	targets := make(map[string]string)
 	for _, p := range packages {
@@ -339,14 +359,6 @@ func getTargetsMap(packages []*Package) map[string]string {
 	}
 
 	return targets
-}
-
-func logConflictResolve(resolveto mergeConflictResolve, path, pkgName string, entry *fsEntry) {
-	if resolveto == noConflict {
-		return
-	}
-
-	launchr.Term().Info().Printfln("[%s] - %s > Selected from %s", pkgName, path, entry.From)
 }
 
 func addEntries(entriesTree []*fsEntry, entriesMap map[string]*fsEntry, entry *fsEntry, path string) ([]*fsEntry, mergeConflictResolve) {

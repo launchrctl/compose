@@ -10,12 +10,14 @@ import (
 	"syscall"
 
 	"github.com/launchrctl/keyring"
-	"github.com/launchrctl/launchr"
+	"github.com/launchrctl/launchr/pkg/action"
 )
 
 const (
-	MainDir        = ".compose"         // MainDir is a compose directory.
-	BuildDir       = MainDir + "/build" // BuildDir is a result directory of compose action.
+	// MainDir is a compose directory.
+	MainDir = ".compose"
+	// BuildDir is a result directory of compose action.
+	BuildDir       = MainDir + "/build"
 	composeFile    = "plasma-compose.yaml"
 	dirPermissions = 0755
 )
@@ -25,40 +27,10 @@ var (
 	errComposeBadStructure = errors.New("incorrect mapping for plasma-compose.yaml, ensure structure is correct")
 )
 
-// Composer stores compose definition
-type Composer struct {
-	pwd     string
-	options *ComposerOptions
-	compose *YamlCompose
-	k       keyring.Keyring
-}
-
-// ComposerOptions - list of possible composer options
-type ComposerOptions struct {
-	Clean              bool
-	WorkingDir         string
-	SkipNotVersioned   bool
-	ConflictsVerbosity bool
-	Interactive        bool
-}
-
-// CreateComposer instance
-func CreateComposer(pwd string, opts ComposerOptions, k keyring.Keyring) (*Composer, error) {
-	config, err := Lookup(os.DirFS(pwd))
-	if err != nil {
-		return nil, err
-	}
-
-	for _, dep := range config.Dependencies {
-		if dep.Source.Tag != "" {
-			launchr.Term().Warning().Printfln("found deprecated field `tag` in `%s` dependency. Use `ref` field for tags or branches.", dep.Name)
-		}
-	}
-
-	return &Composer{pwd, &opts, config, k}, nil
-}
-
 type keyringWrapper struct {
+	action.WithLogger
+	action.WithTerm
+
 	keyringService keyring.Keyring
 	interactive    bool
 	shouldUpdate   bool
@@ -70,7 +42,7 @@ func (kw *keyringWrapper) getForURL(url string) (keyring.CredentialsItem, error)
 		if errors.Is(errGet, keyring.ErrEmptyPass) {
 			return ci, errGet
 		} else if !errors.Is(errGet, keyring.ErrNotFound) {
-			launchr.Log().Debug(errGet.Error())
+			kw.Log().Debug(errGet.Error())
 			return ci, errors.New("the keyring is malformed or wrong passphrase provided")
 		}
 
@@ -98,7 +70,7 @@ func (kw *keyringWrapper) getForURL(url string) (keyring.CredentialsItem, error)
 
 func (kw *keyringWrapper) fillCredentials(ci keyring.CredentialsItem) (keyring.CredentialsItem, error) {
 	if ci.URL != "" {
-		launchr.Term().Printfln("Please add login and password for URL - %s", ci.URL)
+		kw.Term().Printfln("Please add login and password for URL - %s", ci.URL)
 	}
 	err := keyring.RequestCredentialsFromTty(&ci)
 	if err != nil {
@@ -106,6 +78,36 @@ func (kw *keyringWrapper) fillCredentials(ci keyring.CredentialsItem) (keyring.C
 	}
 
 	return ci, nil
+}
+
+// Composer stores compose definition
+type Composer struct {
+	action.WithLogger
+	action.WithTerm
+
+	pwd     string
+	options *ComposerOptions
+	compose *YamlCompose
+	k       keyring.Keyring
+}
+
+// ComposerOptions - list of possible composer options
+type ComposerOptions struct {
+	Clean              bool
+	WorkingDir         string
+	SkipNotVersioned   bool
+	ConflictsVerbosity bool
+	Interactive        bool
+}
+
+// CreateComposer instance
+func CreateComposer(pwd string, opts ComposerOptions, k keyring.Keyring) (*Composer, error) {
+	config, err := Lookup(os.DirFS(pwd))
+	if err != nil {
+		return nil, err
+	}
+
+	return &Composer{pwd: pwd, options: &opts, compose: config, k: k}, nil
 }
 
 // RunInstall on Composer
@@ -117,7 +119,7 @@ func (c *Composer) RunInstall() error {
 
 	go func() {
 		<-signalChan
-		launchr.Term().Printfln("\nTermination signal received. Cleaning up...")
+		c.Term().Printfln("\nTermination signal received. Cleaning up...")
 		// cleanup dir
 		_, _, _ = c.prepareInstall(false)
 
@@ -133,7 +135,13 @@ func (c *Composer) RunInstall() error {
 			return err
 		}
 
-		kw := &keyringWrapper{keyringService: c.getKeyring(), shouldUpdate: false, interactive: c.options.Interactive}
+		kw := &keyringWrapper{
+			keyringService: c.getKeyring(),
+			shouldUpdate:   false,
+			interactive:    c.options.Interactive,
+		}
+		kw.SetLogger(c.Log())
+		kw.SetTerm(c.Term())
 		dm := CreateDownloadManager(kw)
 		packages, err := dm.Download(ctx, c.getCompose(), packagesDir)
 		if err != nil {
@@ -141,11 +149,9 @@ func (c *Composer) RunInstall() error {
 		}
 
 		builder := createBuilder(
-			c.pwd,
+			c,
 			buildDir,
 			packagesDir,
-			c.options.SkipNotVersioned,
-			c.options.ConflictsVerbosity,
 			packages,
 		)
 		return builder.build(ctx)
@@ -153,17 +159,23 @@ func (c *Composer) RunInstall() error {
 }
 
 func (c *Composer) prepareInstall(clean bool) (string, string, error) {
+	for _, dep := range c.compose.Dependencies {
+		if dep.Source.Tag != "" {
+			c.Term().Warning().Printfln("found deprecated field `tag` in `%s` dependency. Use `ref` field for tags or branches.", dep.Name)
+		}
+	}
+
 	buildPath := c.getPath(BuildDir)
 	packagesPath := c.getPath(c.options.WorkingDir)
 
-	launchr.Term().Printfln("Cleaning build dir: %s", BuildDir)
+	c.Term().Printfln("Cleaning build dir: %s", BuildDir)
 	err := os.RemoveAll(buildPath)
 	if err != nil {
 		return "", "", err
 	}
 
 	if clean {
-		launchr.Term().Printfln("Cleaning packages dir: %s", packagesPath)
+		c.Term().Printfln("Cleaning packages dir: %s", packagesPath)
 		err = os.RemoveAll(packagesPath)
 		if err != nil {
 			return "", "", err

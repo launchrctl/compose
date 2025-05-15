@@ -5,8 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-
-	"github.com/launchrctl/launchr"
 )
 
 const (
@@ -36,14 +34,14 @@ func CreateDownloadManager(keyring *keyringWrapper) DownloadManager {
 	return DownloadManager{kw: keyring}
 }
 
-func getDownloaderForPackage(downloadType string, kw *keyringWrapper) Downloader {
+func (m DownloadManager) getDownloaderForPackage(downloadType string) Downloader {
 	switch {
-	case downloadType == GitType:
-		return newGit(kw)
 	case downloadType == HTTPType:
-		return newHTTP(kw)
+		return newHTTP(m.kw)
+	case downloadType == GitType:
+		fallthrough
 	default:
-		return newGit(kw)
+		return newGit(m.kw)
 	}
 }
 
@@ -57,7 +55,7 @@ func (m DownloadManager) Download(ctx context.Context, c *YamlCompose, targetDir
 	}
 
 	kw := m.getKeyring()
-	packages, err = m.recursiveDownload(ctx, c, kw, packages, nil, targetDir)
+	packages, err = m.recursiveDownload(ctx, c, packages, nil, targetDir)
 	if err != nil {
 		return packages, err
 	}
@@ -70,7 +68,7 @@ func (m DownloadManager) Download(ctx context.Context, c *YamlCompose, targetDir
 	return packages, err
 }
 
-func (m DownloadManager) recursiveDownload(ctx context.Context, yc *YamlCompose, kw *keyringWrapper, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
+func (m DownloadManager) recursiveDownload(ctx context.Context, yc *YamlCompose, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
 	for _, d := range yc.Dependencies {
 		select {
 		case <-ctx.Done():
@@ -90,7 +88,7 @@ func (m DownloadManager) recursiveDownload(ctx context.Context, yc *YamlCompose,
 
 			packagePath := filepath.Join(targetDir, pkg.GetName(), pkg.GetTarget())
 
-			err := downloadPackage(ctx, pkg, targetDir, kw)
+			err := m.downloadPackage(ctx, pkg, targetDir)
 			if err != nil {
 				return packages, err
 			}
@@ -99,7 +97,7 @@ func (m DownloadManager) recursiveDownload(ctx context.Context, yc *YamlCompose,
 			if _, err = os.Stat(filepath.Join(packagePath, composeFile)); !os.IsNotExist(err) {
 				cfg, err := Lookup(os.DirFS(packagePath))
 				if err == nil {
-					packages, err = m.recursiveDownload(ctx, cfg, kw, packages, pkg, targetDir)
+					packages, err = m.recursiveDownload(ctx, cfg, packages, pkg, targetDir)
 					if err != nil {
 						return packages, err
 					}
@@ -113,8 +111,8 @@ func (m DownloadManager) recursiveDownload(ctx context.Context, yc *YamlCompose,
 	return packages, nil
 }
 
-func downloadPackage(ctx context.Context, pkg *Package, targetDir string, kw *keyringWrapper) error {
-	downloader := getDownloaderForPackage(pkg.GetType(), kw)
+func (m DownloadManager) downloadPackage(ctx context.Context, pkg *Package, targetDir string) error {
+	downloader := m.getDownloaderForPackage(pkg.GetType())
 	packagePath := filepath.Join(targetDir, pkg.GetName())
 	downloadPath := filepath.Join(packagePath, pkg.GetTarget())
 
@@ -142,7 +140,7 @@ func downloadPackage(ctx context.Context, pkg *Package, targetDir string, kw *ke
 	if err != nil {
 		errRemove := os.RemoveAll(downloadPath)
 		if errRemove != nil {
-			launchr.Log().Debug("error cleaning package folder", "path", downloadPath, "err", err)
+			m.kw.Log().Debug("error cleaning package folder", "path", downloadPath, "err", err)
 		}
 	}
 

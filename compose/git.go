@@ -13,7 +13,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/launchrctl/keyring"
-	"github.com/launchrctl/launchr"
 )
 
 type gitDownloader struct {
@@ -30,7 +29,7 @@ func (g *gitDownloader) fetchRemotes(r *git.Repository, url string, refSpec []co
 		return errR
 	}
 
-	launchr.Term().Printfln("Fetching remote %s", url)
+	g.k.Term().Printfln("Fetching remote %s", url)
 	for _, rem := range remotes {
 		options := git.FetchOptions{
 			//RefSpecs: []config.RefSpec{"refs/*:refs/*", "HEAD:refs/heads/HEAD"},
@@ -70,7 +69,7 @@ func (g *gitDownloader) fetchRemotes(r *git.Repository, url string, refSpec []co
 				if err != nil {
 					if errors.Is(err, transport.ErrAuthorizationFailed) || errors.Is(err, transport.ErrAuthenticationRequired) {
 						if g.k.interactive {
-							launchr.Term().Println("invalid auth, trying manual authorisation")
+							g.k.Term().Println("invalid auth, trying manual authorisation")
 							continue
 						}
 					}
@@ -130,13 +129,13 @@ func (g *gitDownloader) EnsureLatest(pkg *Package, downloadPath string) (bool, e
 
 	r, err := git.PlainOpen(downloadPath)
 	if err != nil {
-		launchr.Log().Debug("git init error", "err", err)
+		g.k.Log().Debug("git init error", "err", err)
 		return false, nil
 	}
 
 	head, err := r.Head()
 	if err != nil {
-		launchr.Log().Debug("get head error", "err", err)
+		g.k.Log().Debug("get head error", "err", err)
 		return false, fmt.Errorf("can't get HEAD of '%s', ensure package is valid", pkg.GetName())
 	}
 
@@ -155,22 +154,22 @@ func (g *gitDownloader) EnsureLatest(pkg *Package, downloadPath string) (bool, e
 		pullTarget = "branch"
 		isLatest, err = g.ensureLatestBranch(r, pkg.GetURL(), pkgRefName, remoteRefName)
 		if err != nil {
-			launchr.Term().Warning().Printfln("Couldn't check local branch, marking package %s(%s) as outdated, see debug for detailed error.", pkg.GetName(), pkgRefName)
-			launchr.Log().Debug("ensure branch error", "err", err)
+			g.k.Term().Warning().Printfln("Couldn't check local branch, marking package %s(%s) as outdated, see debug for detailed error.", pkg.GetName(), pkgRefName)
+			g.k.Log().Debug("ensure branch error", "err", err)
 			return isLatest, nil
 		}
 	} else {
 		pullTarget = "tag"
 		isLatest, err = g.ensureLatestTag(r, pkg.GetURL(), pkgRefName)
 		if err != nil {
-			launchr.Term().Warning().Printfln("Couldn't check local tag, marking package %s(%s) as outdated, see debug for detailed error.", pkg.GetName(), pkgRefName)
-			launchr.Log().Debug("ensure tag error", "err", err)
+			g.k.Term().Warning().Printfln("Couldn't check local tag, marking package %s(%s) as outdated, see debug for detailed error.", pkg.GetName(), pkgRefName)
+			g.k.Log().Debug("ensure tag error", "err", err)
 			return isLatest, nil
 		}
 	}
 
 	if !isLatest {
-		launchr.Term().Info().Printfln("Pulling new changes from %s '%s' of %s package", pullTarget, pkgRefName, pkg.GetName())
+		g.k.Term().Info().Printfln("Pulling new changes from %s '%s' of %s package", pullTarget, pkgRefName, pkg.GetName())
 	}
 
 	return isLatest, nil
@@ -243,7 +242,7 @@ func (g *gitDownloader) ensureLatestTag(r *git.Repository, fetchURL, refName str
 
 // Download implements Downloader.Download interface
 func (g *gitDownloader) Download(ctx context.Context, pkg *Package, targetDir string) error {
-	launchr.Term().Printfln("git fetch: %s", pkg.GetURL())
+	g.k.Term().Printfln("git fetch: %s", pkg.GetURL())
 
 	url := pkg.GetURL()
 	if url == "" {
@@ -304,10 +303,10 @@ func (g *gitDownloader) tryDownload(ctx context.Context, targetDir string, optio
 	for _, authType := range auths {
 		if authType == authorisationNone {
 			_, err := git.PlainCloneContext(ctx, targetDir, false, options)
-			launchr.Term().Println("")
+			g.k.Term().Println("")
 			if err != nil {
 				if errors.Is(err, transport.ErrAuthenticationRequired) {
-					launchr.Term().Println("auth required, trying keyring authorisation")
+					g.k.Term().Println("auth required, trying keyring authorisation")
 					continue
 				}
 
@@ -330,7 +329,7 @@ func (g *gitDownloader) tryDownload(ctx context.Context, targetDir string, optio
 			if err != nil {
 				if errors.Is(err, transport.ErrAuthorizationFailed) || errors.Is(err, transport.ErrAuthenticationRequired) {
 					if g.k.interactive {
-						launchr.Term().Println("invalid auth, trying manual authorisation")
+						g.k.Term().Println("invalid auth, trying manual authorisation")
 						continue
 					}
 				}

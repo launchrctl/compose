@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/launchrctl/keyring"
-	"github.com/launchrctl/launchr"
 )
 
 var (
@@ -59,7 +58,7 @@ func (h *httpDownloader) Download(_ context.Context, pkg *Package, targetDir str
 		return errNoURL
 	}
 
-	launchr.Term().Printfln("http download: %s", name)
+	h.k.Term().Printfln("http download: %s", name)
 	fpath := filepath.Clean(filepath.Join(targetDir, name))
 
 	err := os.MkdirAll(targetDir, dirPermissions)
@@ -74,7 +73,7 @@ func (h *httpDownloader) Download(_ context.Context, pkg *Package, targetDir str
 
 	defer func() {
 		if err = out.Close(); err != nil {
-			launchr.Log().Debug(errFailedClose.Error())
+			h.k.Log().Debug(errFailedClose.Error())
 		}
 	}()
 
@@ -94,11 +93,11 @@ func (h *httpDownloader) Download(_ context.Context, pkg *Package, targetDir str
 			resp, err = doRequest(client, req)
 			if err != nil {
 				if errors.Is(err, errAuthenticationRequired) {
-					launchr.Term().Println("auth required, trying keyring authorisation")
+					h.k.Term().Println("auth required, trying keyring authorisation")
 					continue
 				}
 
-				launchr.Log().Debug(err.Error())
+				h.k.Log().Debug(err.Error())
 				return errDownloadFailed
 			}
 		}
@@ -114,12 +113,12 @@ func (h *httpDownloader) Download(_ context.Context, pkg *Package, targetDir str
 			if err != nil {
 				if errors.Is(err, errAuthorizationFailed) {
 					if h.k.interactive {
-						launchr.Term().Println("invalid auth, trying manual authorisation")
+						h.k.Term().Println("invalid auth, trying manual authorisation")
 						continue
 					}
 				}
 
-				launchr.Log().Debug(err.Error())
+				h.k.Log().Debug(err.Error())
 				return errDownloadFailed
 			}
 		}
@@ -135,7 +134,7 @@ func (h *httpDownloader) Download(_ context.Context, pkg *Package, targetDir str
 			req.SetBasicAuth(ci.Username, ci.Password)
 			resp, err = doRequest(client, req)
 			if err != nil {
-				launchr.Log().Debug(err.Error())
+				h.k.Log().Debug(err.Error())
 				return errDownloadFailed
 			}
 		}
@@ -145,7 +144,7 @@ func (h *httpDownloader) Download(_ context.Context, pkg *Package, targetDir str
 
 	defer func() {
 		if err = resp.Body.Close(); err != nil {
-			launchr.Log().Debug(errFailedClose.Error())
+			h.k.Log().Debug(errFailedClose.Error())
 		}
 	}()
 

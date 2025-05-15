@@ -9,7 +9,7 @@ import (
 
 	"dario.cat/mergo"
 	"github.com/charmbracelet/huh"
-	"github.com/launchrctl/launchr"
+	"github.com/launchrctl/launchr/pkg/action"
 )
 
 // RawStrategies represents collection of submitted flags for strategies.
@@ -18,8 +18,14 @@ type RawStrategies struct {
 	Paths []string
 }
 
+// FormsAction provides form operations with compose file.
+type FormsAction struct {
+	action.WithLogger
+	action.WithTerm
+}
+
 // AddPackage adds a new package to plasma-compose.
-func AddPackage(doCreate bool, newDependency *Dependency, rawStrategies *RawStrategies, dir string) error {
+func (f *FormsAction) AddPackage(doCreate bool, newDependency *Dependency, rawStrategies *RawStrategies, dir string) error {
 	config, err := Lookup(os.DirFS(dir))
 	if err != nil {
 		if !errors.Is(err, errComposeNotExists) {
@@ -55,7 +61,7 @@ func AddPackage(doCreate bool, newDependency *Dependency, rawStrategies *RawStra
 			return err
 		}
 
-		err = processStrategiesForm(newDependency)
+		err = f.processStrategiesForm(newDependency)
 		if err != nil {
 			return err
 		}
@@ -73,7 +79,7 @@ func AddPackage(doCreate bool, newDependency *Dependency, rawStrategies *RawStra
 
 	sanitizeDependency(newDependency)
 	config.Dependencies = append(config.Dependencies, *newDependency)
-	launchr.Term().Println("Saving plasma-compose...")
+	f.Term().Println("Saving plasma-compose...")
 	sortPackages(config)
 	err = writeComposeYaml(config)
 
@@ -81,7 +87,7 @@ func AddPackage(doCreate bool, newDependency *Dependency, rawStrategies *RawStra
 }
 
 // UpdatePackage updates a single package in plasma-compose.
-func UpdatePackage(dependency *Dependency, rawStrategies *RawStrategies, dir string) error {
+func (f *FormsAction) UpdatePackage(dependency *Dependency, rawStrategies *RawStrategies, dir string) error {
 	config, err := Lookup(os.DirFS(dir))
 	if err != nil {
 		return err
@@ -114,7 +120,7 @@ func UpdatePackage(dependency *Dependency, rawStrategies *RawStrategies, dir str
 	}
 
 	sanitizeDependency(toUpdate)
-	launchr.Term().Println("Saving plasma-compose...")
+	f.Term().Println("Saving plasma-compose...")
 	sortPackages(config)
 	err = writeComposeYaml(config)
 
@@ -122,7 +128,7 @@ func UpdatePackage(dependency *Dependency, rawStrategies *RawStrategies, dir str
 }
 
 // UpdatePackages updates packages in plasma-compose in interactive way.
-func UpdatePackages(dir string) error {
+func (f *FormsAction) UpdatePackages(dir string) error {
 	config, err := Lookup(os.DirFS(dir))
 	if err != nil {
 		return err
@@ -162,7 +168,7 @@ func UpdatePackages(dir string) error {
 			return err
 		}
 
-		err = processStrategiesForm(selectedDep)
+		err = f.processStrategiesForm(selectedDep)
 		if err != nil {
 			return err
 		}
@@ -178,7 +184,7 @@ func UpdatePackages(dir string) error {
 		}
 	}
 
-	launchr.Term().Println("Saving plasma-compose...")
+	f.Term().Println("Saving plasma-compose...")
 	var newDeps []Dependency
 	for _, dep := range packagesMap {
 		newDeps = append(newDeps, *dep)
@@ -192,7 +198,7 @@ func UpdatePackages(dir string) error {
 }
 
 // DeletePackages removes packages plasma-compose.
-func DeletePackages(packages []string, dir string) error {
+func (f *FormsAction) DeletePackages(packages []string, dir string) error {
 	config, err := Lookup(os.DirFS(dir))
 	if err != nil {
 		return err
@@ -238,18 +244,18 @@ OUTER:
 	}
 
 	if saveRequired {
-		launchr.Term().Println("Updating plasma-compose...")
+		f.Term().Println("Updating plasma-compose...")
 		config.Dependencies = dependencies
 		sortPackages(config)
 		err = writeComposeYaml(config)
 	} else {
-		launchr.Term().Println("Nothing to update, quiting")
+		f.Term().Println("Nothing to update, quiting")
 	}
 
 	return err
 }
 
-func processStrategiesForm(dependency *Dependency) error {
+func (f *FormsAction) processStrategiesForm(dependency *Dependency) error {
 	var addStrategies bool
 	err := huh.NewConfirm().
 		Title("Would you like to add strategies?").
