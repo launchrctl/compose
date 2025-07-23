@@ -158,7 +158,6 @@ func getInputDependencies(input *action.Input) *compose.Dependency {
 		Source: compose.Source{
 			Type: input.Opt("type").(string),
 			Ref:  input.Opt("ref").(string),
-			Tag:  input.Opt("tag").(string),
 			URL:  input.Opt("url").(string),
 		},
 	}

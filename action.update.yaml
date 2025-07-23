@@ -20,11 +20,6 @@ action:
       description: Reference of the package source
       type: string
       default: ""
-    - name: tag
-      title: Tag
-      description: Tag of the package source
-      type: string
-      default: ""
     - name: url
       title: URL
       description: URL of the package source

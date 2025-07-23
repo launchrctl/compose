@@ -6,15 +6,13 @@ dependencies:
       type: git
       url: https://github.com/example/compose-example.git
       # ref: branch-name
-      # tag: tag-name
-      strategy: null # In case of conflicting file, default strategy is that local file is selected and package file ignored when composing 
+      strategy: null # In case of conflicting file, default strategy is that local file is selected and package file ignored when composing
 
   - name: package-2
     source:
       type: git
       url: https://github.com/example/compose-example.git
       # ref: branch-name
-      # tag: tag-name
       strategy:
         - name: overwrite-local-file # Works with files only.
           path: interaction/file-present-in-package-and-domain   < File from package will override file from domain

@@ -159,12 +159,6 @@ func (c *Composer) RunInstall() error {
 }
 
 func (c *Composer) prepareInstall(clean bool) (string, string, error) {
-	for _, dep := range c.compose.Dependencies {
-		if dep.Source.Tag != "" {
-			c.Term().Warning().Printfln("found deprecated field `tag` in `%s` dependency. Use `ref` field for tags or branches.", dep.Name)
-		}
-	}
-
 	buildPath := c.getPath(BuildDir)
 	packagesPath := c.getPath(c.options.WorkingDir)
 

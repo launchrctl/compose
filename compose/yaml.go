@@ -48,7 +48,6 @@ type Source struct {
 	Type       string     `yaml:"type"`
 	URL        string     `yaml:"url"`
 	Ref        string     `yaml:"ref,omitempty"`
-	Tag        string     `yaml:"tag,omitempty"`
 	Strategies []Strategy `yaml:"strategy,omitempty"`
 }
 
@@ -92,18 +91,7 @@ func (p *Package) GetURL() string {
 
 // GetRef from package source
 func (p *Package) GetRef() string {
-	ref := p.Source.Ref
-	if ref == "" && p.GetTag() != "" {
-		ref = p.GetTag()
-	}
-
-	return ref
-}
-
-// GetTag from package source.
-// Deprecated: use [Package.GetRef]
-func (p *Package) GetTag() string {
-	return p.Source.Tag
+	return p.Source.Ref
 }
 
 // GetTarget returns a target version of package
