@@ -23,8 +23,7 @@ const (
 )
 
 var (
-	errComposeNotExists    = errors.New("plasma-compose.yaml doesn't exist")
-	errComposeBadStructure = errors.New("incorrect mapping for plasma-compose.yaml, ensure structure is correct")
+	errComposeNotExists = errors.New("plasma-compose.yaml doesn't exist")
 )
 
 type keyringWrapper struct {

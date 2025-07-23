@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	// TargetLatest is fallback to latest master branch.
-	TargetLatest = "latest"
+	// TargetLatest is a fallback to the latest version.
+	TargetLatest           = "latest"
+	tplComposeBadStructure = "plasma-compose.yaml parsing failed - %w"
 )
 
 var (
@@ -126,7 +127,7 @@ func Lookup(fsys fs.FS) (*YamlCompose, error) {
 
 	cfg, err := parseComposeYaml(f)
 	if err != nil {
-		return &YamlCompose{}, errComposeBadStructure
+		return &YamlCompose{}, fmt.Errorf(tplComposeBadStructure, err)
 	}
 
 	return cfg, nil

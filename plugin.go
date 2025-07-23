@@ -69,6 +69,10 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 			},
 			p.k,
 		)
+		if err != nil {
+			return err
+		}
+
 		c.SetLogger(log)
 		c.SetTerm(term)
 
