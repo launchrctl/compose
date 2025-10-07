@@ -35,10 +35,10 @@ func CreateDownloadManager(keyring *keyringWrapper) DownloadManager {
 }
 
 func (m DownloadManager) getDownloaderForPackage(downloadType string) Downloader {
-	switch {
-	case downloadType == HTTPType:
+	switch downloadType {
+	case HTTPType:
 		return newHTTP(m.kw)
-	case downloadType == GitType:
+	case GitType:
 		fallthrough
 	default:
 		return newGit(m.kw)

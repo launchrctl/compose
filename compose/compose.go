@@ -4,6 +4,7 @@ package compose
 import (
 	"context"
 	"errors"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -33,6 +34,27 @@ type keyringWrapper struct {
 	keyringService keyring.Keyring
 	interactive    bool
 	shouldUpdate   bool
+}
+
+func baseURL(fullURL string) (string, error) {
+	u, err := url.Parse(fullURL)
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme == "" {
+		u.Scheme = "https"
+	}
+	return u.Scheme + "://" + u.Host, nil
+}
+
+func (kw *keyringWrapper) getForBaseURL(url string) (keyring.CredentialsItem, error) {
+	burl, err := baseURL(url)
+	if err != nil {
+		return keyring.CredentialsItem{}, err
+	}
+
+	ci, err := kw.keyringService.GetForURL(burl)
+	return ci, err
 }
 
 func (kw *keyringWrapper) getForURL(url string) (keyring.CredentialsItem, error) {

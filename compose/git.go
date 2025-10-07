@@ -37,9 +37,9 @@ func (g *gitDownloader) fetchRemotes(r *git.Repository, url string, refSpec []co
 			Force:    true,
 		}
 
-		auths := []authorizationMode{authorisationNone, authorisationKeyring, authorisationManual}
-		for _, authType := range auths {
-			if authType == authorisationNone {
+		auths := []authenticationMode{authenticationModeNone, authenticationModeKeyringGlobal, authenticationModeKeyring, authenticationModeManual}
+		for _, authMode := range auths {
+			if authMode == authenticationModeNone {
 				err := rem.Fetch(&options)
 				if err != nil {
 					if errors.Is(err, transport.ErrAuthenticationRequired) {
@@ -54,7 +54,36 @@ func (g *gitDownloader) fetchRemotes(r *git.Repository, url string, refSpec []co
 				}
 			}
 
-			if authType == authorisationKeyring {
+			if authMode == authenticationModeKeyringGlobal {
+				ci, err := g.k.getForBaseURL(url)
+				if err != nil {
+					if errors.Is(err, keyring.ErrNotFound) {
+						continue
+					}
+
+					return err
+				}
+
+				options.Auth = &http.BasicAuth{
+					Username: ci.Username,
+					Password: ci.Password,
+				}
+
+				err = rem.Fetch(&options)
+				if err != nil {
+					if errors.Is(err, git.NoErrAlreadyUpToDate) {
+						return nil
+					}
+
+					if !errors.Is(err, transport.ErrAuthorizationFailed) || !errors.Is(err, transport.ErrAuthenticationRequired) {
+						return err
+					}
+
+					continue
+				}
+			}
+
+			if authMode == authenticationModeKeyring {
 				ci, err := g.k.getForURL(url)
 				if err != nil {
 					return err
@@ -69,7 +98,7 @@ func (g *gitDownloader) fetchRemotes(r *git.Repository, url string, refSpec []co
 				if err != nil {
 					if errors.Is(err, transport.ErrAuthorizationFailed) || errors.Is(err, transport.ErrAuthenticationRequired) {
 						if g.k.interactive {
-							g.k.Term().Println("invalid auth, trying manual authorisation")
+							g.k.Term().Println("invalid auth, trying manual authentication")
 							continue
 						}
 					}
@@ -82,7 +111,7 @@ func (g *gitDownloader) fetchRemotes(r *git.Repository, url string, refSpec []co
 				}
 			}
 
-			if authType == authorisationManual {
+			if authMode == authenticationModeManual {
 				ci := keyring.CredentialsItem{}
 				ci.URL = url
 				ci, err := g.k.fillCredentials(ci)
@@ -299,14 +328,14 @@ func (g *gitDownloader) buildOptions(url string) *git.CloneOptions {
 
 func (g *gitDownloader) tryDownload(ctx context.Context, targetDir string, options *git.CloneOptions) error {
 	url := options.URL
-	auths := []authorizationMode{authorisationNone, authorisationKeyring, authorisationManual}
-	for _, authType := range auths {
-		if authType == authorisationNone {
+	auths := []authenticationMode{authenticationModeNone, authenticationModeKeyringGlobal, authenticationModeKeyring, authenticationModeManual}
+	for _, authMode := range auths {
+		if authMode == authenticationModeNone {
 			_, err := git.PlainCloneContext(ctx, targetDir, false, options)
 			g.k.Term().Println("")
 			if err != nil {
 				if errors.Is(err, transport.ErrAuthenticationRequired) {
-					g.k.Term().Println("auth required, trying keyring authorisation")
+					g.k.Term().Println("auth required, trying keyring authentication")
 					continue
 				}
 
@@ -314,7 +343,32 @@ func (g *gitDownloader) tryDownload(ctx context.Context, targetDir string, optio
 			}
 		}
 
-		if authType == authorisationKeyring {
+		if authMode == authenticationModeKeyringGlobal {
+			ci, err := g.k.getForBaseURL(url)
+			if err != nil {
+				if errors.Is(err, keyring.ErrNotFound) {
+					continue
+				}
+
+				return err
+			}
+
+			options.Auth = &http.BasicAuth{
+				Username: ci.Username,
+				Password: ci.Password,
+			}
+
+			_, err = git.PlainCloneContext(ctx, targetDir, false, options)
+			if err != nil {
+				if !errors.Is(err, transport.ErrAuthorizationFailed) || !errors.Is(err, transport.ErrAuthenticationRequired) {
+					return err
+				}
+
+				continue
+			}
+		}
+
+		if authMode == authenticationModeKeyring {
 			ci, err := g.k.getForURL(url)
 			if err != nil {
 				return err
@@ -329,7 +383,7 @@ func (g *gitDownloader) tryDownload(ctx context.Context, targetDir string, optio
 			if err != nil {
 				if errors.Is(err, transport.ErrAuthorizationFailed) || errors.Is(err, transport.ErrAuthenticationRequired) {
 					if g.k.interactive {
-						g.k.Term().Println("invalid auth, trying manual authorisation")
+						g.k.Term().Println("invalid auth, trying manual authentication")
 						continue
 					}
 				}
@@ -338,7 +392,7 @@ func (g *gitDownloader) tryDownload(ctx context.Context, targetDir string, optio
 			}
 		}
 
-		if authType == authorisationManual {
+		if authMode == authenticationModeManual {
 			ci := keyring.CredentialsItem{}
 			ci.URL = url
 			ci, err := g.k.fillCredentials(ci)
@@ -363,10 +417,11 @@ func (g *gitDownloader) tryDownload(ctx context.Context, targetDir string, optio
 	return nil
 }
 
-type authorizationMode int
+type authenticationMode int
 
 const (
-	authorisationNone authorizationMode = iota
-	authorisationKeyring
-	authorisationManual
+	authenticationModeNone authenticationMode = iota
+	authenticationModeKeyringGlobal
+	authenticationModeKeyring
+	authenticationModeManual
 )

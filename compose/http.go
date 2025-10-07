@@ -82,18 +82,18 @@ func (h *httpDownloader) Download(_ context.Context, pkg *Package, targetDir str
 
 	errDownloadFailed := fmt.Errorf("failed to download package: %s", name)
 
-	auths := []authorizationMode{authorisationNone, authorisationKeyring, authorisationManual}
-	for _, authType := range auths {
+	auths := []authenticationMode{authenticationModeNone, authenticationModeKeyring, authenticationModeManual}
+	for _, authMod := range auths {
 		req, errReq := http.NewRequest(http.MethodGet, url, nil)
 		if errReq != nil {
 			return errReq
 		}
 
-		if authType == authorisationNone {
+		if authMod == authenticationModeNone {
 			resp, err = doRequest(client, req)
 			if err != nil {
 				if errors.Is(err, errAuthenticationRequired) {
-					h.k.Term().Println("auth required, trying keyring authorisation")
+					h.k.Term().Println("auth required, trying keyring authentication")
 					continue
 				}
 
@@ -102,7 +102,7 @@ func (h *httpDownloader) Download(_ context.Context, pkg *Package, targetDir str
 			}
 		}
 
-		if authType == authorisationKeyring {
+		if authMod == authenticationModeKeyring {
 			ci, errGet := h.k.getForURL(url)
 			if errGet != nil {
 				return errGet
@@ -113,7 +113,7 @@ func (h *httpDownloader) Download(_ context.Context, pkg *Package, targetDir str
 			if err != nil {
 				if errors.Is(err, errAuthorizationFailed) {
 					if h.k.interactive {
-						h.k.Term().Println("invalid auth, trying manual authorisation")
+						h.k.Term().Println("invalid auth, trying manual authentication")
 						continue
 					}
 				}
@@ -123,7 +123,7 @@ func (h *httpDownloader) Download(_ context.Context, pkg *Package, targetDir str
 			}
 		}
 
-		if authType == authorisationManual {
+		if authMod == authenticationModeManual {
 			ci := keyring.CredentialsItem{}
 			ci.URL = url
 			ci, errFill := h.k.fillCredentials(ci)
