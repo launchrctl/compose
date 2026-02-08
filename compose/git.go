@@ -156,7 +156,7 @@ func (g *gitDownloader) EnsureLatest(pkg *Package, downloadPath string) (bool, e
 		return false, nil
 	}
 
-	r, err := git.PlainOpen(downloadPath)
+	r, err := git.PlainOpenWithOptions(downloadPath, &git.PlainOpenOptions{EnableDotGitCommonDir: true})
 	if err != nil {
 		g.k.Log().Debug("git init error", "err", err)
 		return false, nil

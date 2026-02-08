@@ -156,7 +156,7 @@ func createBuilder(c *Composer, targetDir, sourceDir string, packages []*Package
 
 func getVersionedMap(gitDir string) (map[string]bool, error) {
 	versionedFiles := make(map[string]bool)
-	repo, err := git.PlainOpen(gitDir)
+	repo, err := git.PlainOpenWithOptions(gitDir, &git.PlainOpenOptions{EnableDotGitCommonDir: true})
 	if err != nil {
 		return versionedFiles, err
 	}
