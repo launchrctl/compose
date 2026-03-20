@@ -1,0 +1,44 @@
+# ignore-extra-package-files: pkg-b ignores config/ — the file from pkg-a is preserved,
+# even though pkg-b is declared later and would win by default.
+#
+# Layout:
+#   $WORK/src/pkg-a/  — package source
+#   $WORK/src/pkg-b/  — package source
+#   $WORK/platform/   — domain, compose runs here
+
+exec sh -c 'cd platform && launchr compose --interactive=false'
+stdout 'Creating composition'
+! stderr .
+
+# pkg-b ignores config/ → file from pkg-a is not overwritten
+grep 'from pkg-a' platform/.compose/build/config/app.yml
+
+# pkg-b does not ignore scripts/ → its version wins (last-wins)
+grep 'from pkg-b' platform/.compose/build/scripts/run.sh
+
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+  - name: pkg-b
+    source:
+      type: path
+      url: ../src/pkg-b
+      strategy:
+        - name: ignore-extra-package-files
+          path:
+            - config/
+
+-- src/pkg-a/config/app.yml --
+from pkg-a
+
+-- src/pkg-a/scripts/run.sh --
+from pkg-a
+
+-- src/pkg-b/config/app.yml --
+from pkg-b
+
+-- src/pkg-b/scripts/run.sh --
+from pkg-b

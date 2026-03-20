@@ -1,0 +1,25 @@
+# Platform files override package files (platform is always processed last).
+# Both pkg-a and the platform dir have shared.txt — the platform version wins.
+#
+# Layout:
+#   $WORK/src/pkg-a/  — package source
+#   $WORK/platform/   — domain, compose runs here
+
+exec sh -c 'cd platform && launchr compose --interactive=false'
+stdout 'Creating composition'
+! stderr .
+
+grep 'from platform' platform/.compose/build/shared.txt
+
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+
+-- src/pkg-a/shared.txt --
+from pkg-a
+
+-- platform/shared.txt --
+from platform

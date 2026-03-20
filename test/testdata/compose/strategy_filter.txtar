@@ -1,0 +1,46 @@
+# filter-package-files: only files matching the listed paths are included in the build.
+# pkg-a has a filter on config/ — only config/ is taken, scripts/ is dropped.
+# pkg-b has no strategy — all files are included.
+#
+# Layout:
+#   $WORK/src/pkg-a/  — package source
+#   $WORK/src/pkg-b/  — package source
+#   $WORK/platform/   — domain, compose runs here
+
+exec sh -c 'cd platform && launchr compose --interactive=false'
+stdout 'Creating composition'
+! stderr .
+
+# pkg-a: config/ passed the filter
+exists platform/.compose/build/config/app.yml
+
+# pkg-a: scripts/ did not pass the filter — not in the build
+! exists platform/.compose/build/scripts/run.sh
+
+# pkg-b: no strategy — all files included
+exists platform/.compose/build/README.md
+
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+      strategy:
+        - name: filter-package-files
+          path:
+            - config/
+  - name: pkg-b
+    source:
+      type: path
+      url: ../src/pkg-b
+
+-- src/pkg-a/config/app.yml --
+app: config
+
+-- src/pkg-a/scripts/run.sh --
+#!/bin/sh
+echo run
+
+-- src/pkg-b/README.md --
+pkg-b readme

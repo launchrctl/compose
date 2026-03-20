@@ -1,0 +1,41 @@
+# --clean removes the packages dir before the build.
+# The build dir is always recreated (even without --clean).
+#
+# Layout:
+#   $WORK/src/pkg-a/  — package source
+#   $WORK/platform/   — domain, compose runs here
+
+# First run — without --clean, packages are downloaded.
+exec sh -c 'cd platform && launchr compose --interactive=false'
+stdout 'Creating composition'
+! stdout 'Cleaning packages dir'
+exists platform/.compose/build/app.yml
+exists platform/.compose/packages
+
+# Add a stale file to the build dir manually.
+cp platform/app.yml platform/.compose/build/stale.txt
+
+# Second run without --clean: build dir is recreated → stale.txt is gone.
+# packages dir is not touched.
+exec sh -c 'cd platform && launchr compose --interactive=false'
+! stdout 'Cleaning packages dir'
+exists platform/.compose/build/app.yml
+! exists platform/.compose/build/stale.txt
+
+# Third run with --clean: packages dir is also cleaned and recreated.
+exec sh -c 'cd platform && launchr compose --interactive=false --clean=true'
+stdout 'Cleaning packages dir'
+exists platform/.compose/build/app.yml
+
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+
+-- src/pkg-a/app.yml --
+app: config
+
+-- platform/app.yml --
+platform file

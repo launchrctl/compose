@@ -1,0 +1,31 @@
+# Two flat packages (type: path, no nested deps).
+# Both packages must appear in the build output.
+#
+# Layout:
+#   $WORK/src/pkg-a/  — package source
+#   $WORK/src/pkg-b/  — package source
+#   $WORK/platform/   — domain, compose runs here
+
+exec sh -c 'cd platform && launchr compose --interactive=false'
+stdout 'Creating composition'
+! stderr .
+
+exists platform/.compose/build/pkg-a.txt
+exists platform/.compose/build/pkg-b.txt
+
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+  - name: pkg-b
+    source:
+      type: path
+      url: ../src/pkg-b
+
+-- src/pkg-a/pkg-a.txt --
+pkg-a content
+
+-- src/pkg-b/pkg-b.txt --
+pkg-b content

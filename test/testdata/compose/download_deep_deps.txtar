@@ -1,0 +1,46 @@
+# Deep dependency chain: platform → pkg-a → lib-common → lib-base.
+# All three transitive packages must appear in the build.
+#
+# Layout:
+#   $WORK/src/pkg-a/      — package source
+#   $WORK/src/lib-common/ — transitive dep
+#   $WORK/src/lib-base/   — transitive dep (level 3)
+#   $WORK/platform/       — domain, compose runs here
+
+exec sh -c 'cd platform && launchr compose --interactive=false'
+stdout 'Creating composition'
+! stderr .
+
+exists platform/.compose/build/pkg-a.txt
+exists platform/.compose/build/lib-common.txt
+exists platform/.compose/build/lib-base.txt
+
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+
+-- src/pkg-a/pkg-a.txt --
+pkg-a content
+
+-- src/pkg-a/plasma-compose.yaml --
+dependencies:
+  - name: lib-common
+    source:
+      type: path
+      url: ../src/lib-common
+
+-- src/lib-common/lib-common.txt --
+lib-common content
+
+-- src/lib-common/plasma-compose.yaml --
+dependencies:
+  - name: lib-base
+    source:
+      type: path
+      url: ../src/lib-base
+
+-- src/lib-base/lib-base.txt --
+lib-base content

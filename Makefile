@@ -110,6 +110,23 @@ test: .install-gotestfmt
 	echo "$(BOLD)$(RED)🧪 ❌ Some tests failed$(RESET)"
 	@echo
 
+# Run all tests with race detector
+.PHONY: test-race
+test-race: .install-gotestfmt
+	$(call print_step,"Running all tests with race detector...")
+	@go test -json -race -v ./... | $(GOTESTFMT_BIN) -hide all && \
+	echo "$(BOLD)$(GREEN)🧪 ✅ All tests passed (race detector clean)$(RESET)" || \
+	echo "$(BOLD)$(RED)🧪 ❌ Some tests failed$(RESET)"
+	@echo
+
+# Run integration tests keeping work dir for inspection
+# Usage: make test-integration [TEST=build_lock]
+.PHONY: test-integration
+test-integration: .install-gotestfmt
+	$(call print_step,"Running integration tests — keeping work dir...")
+	@go test -json -v -run "TestCompose$(if $(TEST),/$(TEST),)" ./test/ -args -testwork | $(GOTESTFMT_BIN)
+	@echo
+
 # Run short tests
 .PHONY: test-short
 test-short: .install-gotestfmt
@@ -133,6 +150,13 @@ build:
 # Install launchr
 .PHONY: install
 install: all
+	$(call print_step,"Installing launchr to GOPATH...")
+	@cp $(LOCAL_BIN)/launchr $(GOBIN)/launchr
+	$(call print_success,"🚀 launchr installed to $(GOBIN)/launchr")
+
+# Install launchr without running tests
+.PHONY: install-bin
+install-bin: deps build
 	$(call print_step,"Installing launchr to GOPATH...")
 	@cp $(LOCAL_BIN)/launchr $(GOBIN)/launchr
 	$(call print_success,"🚀 launchr installed to $(GOBIN)/launchr")
@@ -189,19 +213,22 @@ help:
 	$(call print_header)
 	@echo "$(BOLD)$(WHITE)Available targets:$(RESET)"
 	@echo ""
-	@echo "  $(BOLD)$(GREEN)all$(RESET)         🎯 Run deps, test, and build"
-	@echo "  $(BOLD)$(GREEN)deps$(RESET)        📦 Install go dependencies"
-	@echo "  $(BOLD)$(GREEN)test$(RESET)        🧪 Run all tests"
-	@echo "  $(BOLD)$(GREEN)test-short$(RESET)  ⚡ Run short tests only"
-	@echo "  $(BOLD)$(GREEN)build$(RESET)       🔨 Build launchr binary"
-	@echo "  $(BOLD)$(GREEN)install$(RESET)     🚀 Install launchr to GOPATH"
-	@echo "  $(BOLD)$(GREEN)lint$(RESET)        🔍 Run linters with auto-fix"
-	@echo "  $(BOLD)$(GREEN)clean$(RESET)       🧹 Clean build artifacts"
-	@echo "  $(BOLD)$(GREEN)help$(RESET)        ❓ Show this help message"
+	@echo "  $(BOLD)$(GREEN)all$(RESET)              🎯 Run deps, test, and build"
+	@echo "  $(BOLD)$(GREEN)deps$(RESET)             📦 Install go dependencies"
+	@echo "  $(BOLD)$(GREEN)test$(RESET)             🧪 Run all tests"
+	@echo "  $(BOLD)$(GREEN)test-race$(RESET)        🏁 Run all tests with race detector"
+	@echo "  $(BOLD)$(GREEN)test-integration$(RESET) 🔬 Run integration tests keeping work dir (TEST=name to filter)"
+	@echo "  $(BOLD)$(GREEN)test-short$(RESET)       ⚡ Run short tests only"
+	@echo "  $(BOLD)$(GREEN)build$(RESET)            🔨 Build launchr binary"
+	@echo "  $(BOLD)$(GREEN)install$(RESET)          🚀 Install launchr to GOPATH (with tests)"
+	@echo "  $(BOLD)$(GREEN)install-bin$(RESET)      🚀 Install launchr to GOPATH (without tests)"
+	@echo "  $(BOLD)$(GREEN)lint$(RESET)             🔍 Run linters with auto-fix"
+	@echo "  $(BOLD)$(GREEN)clean$(RESET)            🧹 Clean build artifacts"
+	@echo "  $(BOLD)$(GREEN)help$(RESET)             ❓ Show this help message"
 	@echo ""
 	@echo "$(BOLD)$(CYAN)Environment variables:$(RESET)"
-	@echo "  $(BOLD)$(YELLOW)DEBUG=1$(RESET)     Enable debug build"
-	@echo "  $(BOLD)$(YELLOW)BIN=path$(RESET)    Custom binary output path"
+	@echo "  $(BOLD)$(YELLOW)DEBUG=1$(RESET)          Enable debug build"
+	@echo "  $(BOLD)$(YELLOW)BIN=path$(RESET)         Custom binary output path"
 	@echo ""
 
 # Default target shows help

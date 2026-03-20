@@ -1,0 +1,40 @@
+# --conflicts-verbosity prints conflict information for files provided by multiple packages.
+# pkg-a and pkg-b both provide shared.txt — pkg-b wins (last-wins).
+# The output must contain a conflict line for shared.txt.
+#
+# Layout:
+#   $WORK/src/pkg-a/  — package source
+#   $WORK/src/pkg-b/  — package source
+#   $WORK/platform/   — domain, compose runs here
+
+exec sh -c 'cd platform && launchr compose --interactive=false --conflicts-verbosity=true'
+stdout 'Creating composition'
+stdout 'Conflicting files'
+stdout 'shared\.txt'
+! stderr .
+
+# pkg-b won
+grep 'from pkg-b' platform/.compose/build/shared.txt
+
+# file with no conflict — must still appear in the build
+exists platform/.compose/build/only-in-pkg-a.txt
+
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+  - name: pkg-b
+    source:
+      type: path
+      url: ../src/pkg-b
+
+-- src/pkg-a/shared.txt --
+from pkg-a
+
+-- src/pkg-a/only-in-pkg-a.txt --
+unique to pkg-a
+
+-- src/pkg-b/shared.txt --
+from pkg-b

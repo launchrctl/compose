@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	// DependencyRoot is a dependencies graph main node
-	DependencyRoot = "root"
-	gitPrefix      = ".git"
+	// DependencyPlatform is the platform node in the dependencies graph, always processed last
+	DependencyPlatform = "platform"
+	gitPrefix          = ".git"
 )
 
 var excludedFolders = map[string]struct{}{".compose": {}}
@@ -35,13 +35,11 @@ type mergeStrategy struct {
 
 const (
 	undefinedStrategy       mergeStrategyType    = iota
-	overwriteLocalFile      mergeStrategyType    = 1
-	removeExtraLocalFiles   mergeStrategyType    = 2
-	ignoreExtraPackageFiles mergeStrategyType    = 3
-	filterPackageFiles      mergeStrategyType    = 4
+	removeExtraLocalFiles   mergeStrategyType    = 1
+	ignoreExtraPackageFiles mergeStrategyType    = 2
+	filterPackageFiles      mergeStrategyType    = 3
 	noConflict              mergeConflictResolve = iota
-	resolveToLocal          mergeConflictResolve = 1
-	resolveToPackage        mergeConflictResolve = 2
+	resolveToPackage        mergeConflictResolve = 1
 	localStrategy           mergeStrategyTarget  = 1
 	packageStrategy         mergeStrategyTarget  = 2
 )
@@ -107,7 +105,7 @@ func identifyStrategy(name string) (mergeStrategyType, mergeStrategyTarget) {
 
 	switch name {
 	case StrategyOverwriteLocal:
-		s = overwriteLocalFile
+		// deprecated: no-op, default conflict resolution is last-writer-wins
 	case StrategyRemoveExtraLocal:
 		s = removeExtraLocalFiles
 		t = localStrategy
@@ -131,6 +129,7 @@ type Builder struct {
 	skipNotVersioned bool
 	logConflicts     bool
 	packages         []*Package
+	requiredBy       map[string][]string
 }
 
 type fsEntry struct {
@@ -141,7 +140,7 @@ type fsEntry struct {
 	From     string
 }
 
-func createBuilder(c *Composer, targetDir, sourceDir string, packages []*Package) *Builder {
+func createBuilder(c *Composer, targetDir, sourceDir string, packages []*Package, requiredBy map[string][]string) *Builder {
 	return &Builder{
 		c.WithLogger,
 		c.WithTerm,
@@ -151,6 +150,7 @@ func createBuilder(c *Composer, targetDir, sourceDir string, packages []*Package
 		c.options.SkipNotVersioned,
 		c.options.ConflictsVerbosity,
 		packages,
+		requiredBy,
 	}
 }
 
@@ -197,63 +197,20 @@ func (b *Builder) build(ctx context.Context) error {
 	}
 
 	ls, ps := retrieveStrategies(b.packages)
-	baseFs := os.DirFS(b.platformDir)
+
+	for _, pkg := range b.packages {
+		for _, s := range pkg.GetStrategies() {
+			if s.Name == StrategyOverwriteLocal {
+				b.Term().Warning().Printfln("strategy %q in package %q is deprecated and has no effect, default conflict resolution is now last-writer-wins", StrategyOverwriteLocal, pkg.GetName())
+			}
+		}
+	}
 
 	entriesMap := make(map[string]*fsEntry)
 	var entriesTree []*fsEntry
 
-	// @todo move to function
-	err = fs.WalkDir(baseFs, ".", func(path string, d fs.DirEntry, err error) error {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			if err != nil {
-				return err
-			}
-
-			root := rgxPathRoot.FindString(path)
-			if _, ok := excludedFolders[root]; ok {
-				return nil
-			}
-
-			if !d.IsDir() {
-				filename := filepath.Base(path)
-				if _, ok := excludedFiles[filename]; ok {
-					return nil
-				}
-			}
-
-			// Apply strategies that target local files
-			for _, localStrategy := range ls {
-				if localStrategy.s == removeExtraLocalFiles {
-					if ensureStrategyPrefixPath(path, localStrategy.paths) {
-						return nil
-					}
-				}
-			}
-
-			// Add .git folder into entriesTree whenever CheckVersioned or not
-			if checkVersioned && !strings.HasPrefix(path, gitPrefix) {
-				if _, ok := versionedMap[path]; !ok {
-					return nil
-				}
-			}
-
-			finfo, _ := d.Info()
-			entry := &fsEntry{Prefix: b.platformDir, Path: path, Entry: finfo, Excluded: false, From: "domain repo"}
-			entriesTree = append(entriesTree, entry)
-			entriesMap[path] = entry
-			return nil
-		}
-	})
-
-	if err != nil {
-		return err
-	}
-
 	graph := buildDependenciesGraph(b.packages)
-	items, _ := graph.TopSort(DependencyRoot)
+	items, _ := graph.TopSort(DependencyPlatform)
 	targetsMap := getTargetsMap(b.packages)
 
 	if b.logConflicts {
@@ -266,7 +223,56 @@ func (b *Builder) build(ctx context.Context) error {
 			return ctx.Err()
 		default:
 			pkgName := items[i]
-			if pkgName != DependencyRoot {
+			switch pkgName {
+			case DependencyPlatform:
+				baseFs := os.DirFS(b.platformDir)
+				err = fs.WalkDir(baseFs, ".", func(path string, d fs.DirEntry, err error) error {
+					if err != nil {
+						return err
+					}
+
+					root := rgxPathRoot.FindString(path)
+					if _, ok := excludedFolders[root]; ok {
+						return nil
+					}
+
+					if !d.IsDir() {
+						filename := filepath.Base(path)
+						if _, ok := excludedFiles[filename]; ok {
+							return nil
+						}
+					}
+
+					for _, localStrategy := range ls {
+						if localStrategy.s == removeExtraLocalFiles {
+							if ensureStrategyPrefixPath(path, localStrategy.paths) {
+								return nil
+							}
+						}
+					}
+
+					if checkVersioned && !strings.HasPrefix(path, gitPrefix) {
+						if _, ok := versionedMap[path]; !ok {
+							return nil
+						}
+					}
+
+					finfo, _ := d.Info()
+					entry := &fsEntry{Prefix: b.platformDir, Path: path, Entry: finfo, Excluded: false, From: DependencyPlatform}
+					var conflictReslv mergeConflictResolve
+					entriesTree, conflictReslv = addEntries(entriesTree, entriesMap, entry, path)
+
+					if b.logConflicts && !d.IsDir() {
+						b.logConflictResolve(conflictReslv, path, DependencyPlatform, entriesMap[path])
+					}
+
+					return nil
+				})
+
+				if err != nil {
+					return err
+				}
+			default:
 				pkgPath := filepath.Join(b.sourceDir, pkgName, targetsMap[pkgName])
 				packageFs := os.DirFS(pkgPath)
 				strategies, ok := ps[pkgName]
@@ -278,6 +284,12 @@ func (b *Builder) build(ctx context.Context) error {
 					// Skip .git folder from packages
 					if strings.HasPrefix(path, gitPrefix) {
 						return nil
+					}
+
+					if !d.IsDir() {
+						if _, excluded := excludedFiles[filepath.Base(path)]; excluded {
+							return nil
+						}
 					}
 
 					var conflictReslv mergeConflictResolve
@@ -341,7 +353,29 @@ func (b *Builder) build(ctx context.Context) error {
 		}
 	}
 
-	return nil
+	// Write lock file in topological order (same order used for file merging).
+	// items contains DependencyPlatform as last entry — exclude it.
+	pkgByName := make(map[string]*Package, len(b.packages))
+	for _, pkg := range b.packages {
+		pkgByName[pkg.GetName()] = pkg
+	}
+	sortedPackages := make([]*Package, 0, len(b.packages))
+	for _, name := range items {
+		if name == DependencyPlatform {
+			continue
+		}
+		if pkg, ok := pkgByName[name]; ok {
+			sortedPackages = append(sortedPackages, pkg)
+		}
+	}
+
+	var lock *Lock
+	lock, err = buildLock(sortedPackages, b.platformDir, b.sourceDir, b.requiredBy)
+	if err != nil {
+		return err
+	}
+
+	return writeLock(lock, b.targetDir)
 }
 
 func (b *Builder) logConflictResolve(resolveto mergeConflictResolve, path, pkgName string, entry *fsEntry) {
@@ -362,16 +396,18 @@ func getTargetsMap(packages []*Package) map[string]string {
 }
 
 func addEntries(entriesTree []*fsEntry, entriesMap map[string]*fsEntry, entry *fsEntry, path string) ([]*fsEntry, mergeConflictResolve) {
-	conflictResolve := noConflict
-	if _, ok := entriesMap[path]; !ok {
+	existing, ok := entriesMap[path]
+	if !ok {
 		entriesTree = append(entriesTree, entry)
 		entriesMap[path] = entry
-	} else {
-		// Be default all conflicts auto-resolved to local.
-		conflictResolve = resolveToLocal
+		return entriesTree, noConflict
 	}
 
-	return entriesTree, conflictResolve
+	// Last writer wins: overwrite existing entry in-place so entriesTree pointer stays valid.
+	existing.Prefix = entry.Prefix
+	existing.Entry = entry.Entry
+	existing.From = entry.From
+	return entriesTree, resolveToPackage
 }
 
 func addStrategyEntries(strategies []*mergeStrategy, entriesTree []*fsEntry, entriesMap map[string]*fsEntry, entry *fsEntry, path string) ([]*fsEntry, mergeConflictResolve) {
@@ -380,27 +416,9 @@ func addStrategyEntries(strategies []*mergeStrategy, entriesTree []*fsEntry, ent
 	// Apply strategies package strategies
 	for _, ms := range strategies {
 		switch ms.s {
-		case overwriteLocalFile:
-			// Skip strategy if filepath does not match strategy Paths
-			if !ensureStrategyPrefixPath(path, ms.paths) {
-				continue
-			}
-
-			if localMapEntry, ok := entriesMap[path]; !ok {
-				entriesTree = append(entriesTree, entry)
-				entriesMap[path] = entry
-			} else if ensureStrategyPrefixPath(path, ms.paths) {
-				localMapEntry.Prefix = entry.Prefix
-				localMapEntry.Entry = entry.Entry
-				localMapEntry.From = entry.From
-
-				// Strategy replaces local Paths by package one.
-				conflictResolve = resolveToPackage
-			}
 		case filterPackageFiles:
-			if _, ok := entriesMap[path]; !ok && (ensureStrategyPrefixPath(path, ms.paths) || (entry.Entry.IsDir() && ensureStrategyContainsPath(path, ms.paths))) {
-				entriesTree = append(entriesTree, entry)
-				entriesMap[path] = entry
+			if ensureStrategyPrefixPath(path, ms.paths) || (entry.Entry.IsDir() && ensureStrategyContainsPath(path, ms.paths)) {
+				entriesTree, conflictResolve = addEntries(entriesTree, entriesMap, entry, path)
 			}
 
 		case ignoreExtraPackageFiles:
@@ -455,10 +473,28 @@ func buildDependenciesGraph(packages []*Package) *topsort.Graph {
 		}
 	}
 
-	for n, k := range packageNames {
-		if k {
-			_ = graph.AddEdge(DependencyRoot, n)
+	// Platform is the topsort root — all top-level packages are its dependencies,
+	// so they are processed first and platform always comes last.
+	graph.AddNode(DependencyPlatform)
+
+	// Collect top-level packages in YAML declaration order (preserved by the packages slice).
+	// Later in YAML = processed later = wins with last-writer-wins.
+	var topLevel []string
+	seen := make(map[string]bool)
+	for _, a := range packages {
+		n := a.GetName()
+		if packageNames[n] && !seen[n] {
+			topLevel = append(topLevel, n)
+			seen[n] = true
 		}
+	}
+
+	for _, n := range topLevel {
+		_ = graph.AddEdge(DependencyPlatform, n)
+	}
+	// Enforce YAML order between siblings: topLevel[i] processed before topLevel[i+1].
+	for i := 1; i < len(topLevel); i++ {
+		_ = graph.AddEdge(topLevel[i], topLevel[i-1])
 	}
 
 	return graph

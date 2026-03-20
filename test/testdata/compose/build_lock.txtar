@@ -1,0 +1,101 @@
+# Lock file is written to .compose/build/plasma-compose.lock after a successful build.
+# Uses a deep diamond dependency to verify: transitive packages at multiple levels
+# are included, order is topological, and required_by is correct at each level.
+#
+# Graph:  pkg-a ──┐
+#                 ├── lib-common ── lib-base
+#         pkg-b ──┘
+#
+# Topsort order: lib-base → lib-common → pkg-a → pkg-b
+#
+# Layout:
+#   $WORK/src/pkg-a/      — package source
+#   $WORK/src/pkg-b/      — package source
+#   $WORK/src/lib-common/ — transitive dep
+#   $WORK/src/lib-base/   — transitive dep (level 3)
+#   $WORK/platform/       — domain, compose runs here
+
+exec sh -c 'cd platform && launchr compose --interactive=false'
+stdout 'Creating composition'
+! stderr .
+
+exists platform/.compose/build/plasma-compose.lock
+
+# full content check: verifies topological order, required_by at each level
+# (lib-common has two parents: pkg-a and pkg-b), paths and types.
+cmp platform/.compose/build/plasma-compose.lock expected_lock.yaml
+
+-- expected_lock.yaml --
+packages:
+    - name: lib-base
+      type: path
+      url: ../src/lib-base
+      ref: ""
+      path: .compose/packages/lib-base/latest
+      required_by:
+        - lib-common
+    - name: lib-common
+      type: path
+      url: ../src/lib-common
+      ref: ""
+      path: .compose/packages/lib-common/latest
+      required_by:
+        - pkg-a
+        - pkg-b
+    - name: pkg-a
+      type: path
+      url: ../src/pkg-a
+      ref: ""
+      path: .compose/packages/pkg-a/latest
+      required_by:
+        - root
+    - name: pkg-b
+      type: path
+      url: ../src/pkg-b
+      ref: ""
+      path: .compose/packages/pkg-b/latest
+      required_by:
+        - root
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+  - name: pkg-b
+    source:
+      type: path
+      url: ../src/pkg-b
+
+-- src/pkg-a/plasma-compose.yaml --
+dependencies:
+  - name: lib-common
+    source:
+      type: path
+      url: ../src/lib-common
+
+-- src/pkg-b/plasma-compose.yaml --
+dependencies:
+  - name: lib-common
+    source:
+      type: path
+      url: ../src/lib-common
+
+-- src/lib-common/plasma-compose.yaml --
+dependencies:
+  - name: lib-base
+    source:
+      type: path
+      url: ../src/lib-base
+
+-- src/lib-base/base.txt --
+lib-base content
+
+-- src/lib-common/common.txt --
+lib-common content
+
+-- src/pkg-a/pkg-a.txt --
+pkg-a content
+
+-- src/pkg-b/pkg-b.txt --
+pkg-b content
