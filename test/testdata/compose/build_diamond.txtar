@@ -1,0 +1,88 @@
+# Diamond dependency: pkg-a and pkg-b both depend on lib-common.
+#
+# Graph:          platform
+#               /        \
+#           pkg-a        pkg-b
+#               \        /
+#              lib-common
+#
+# Topsort order: lib-common → pkg-a → pkg-b → platform
+# lib-common is downloaded once (dedup in download).
+# On conflict: pkg-b is declared last → wins (last-wins).
+#
+# Layout:
+#   $WORK/src/pkg-a/      — package source
+#   $WORK/src/pkg-b/      — package source
+#   $WORK/src/lib-common/ — shared transitive dep
+#   $WORK/platform/       — domain, compose runs here
+
+exec sh -c 'cd platform && launchr compose --interactive=false'
+stdout 'Creating composition'
+! stderr .
+
+# lib-common: unique file appears in the build
+exists platform/.compose/build/lib/common.txt
+
+# pkg-a: unique file appears in the build
+exists platform/.compose/build/pkg-a.txt
+
+# pkg-b: unique file appears in the build
+exists platform/.compose/build/pkg-b.txt
+
+# shared.txt: lib-common → pkg-a → pkg-b, pkg-b wins (last in YAML)
+grep 'from pkg-b' platform/.compose/build/shared.txt
+
+# override.txt: overwritten by pkg-a then pkg-b → pkg-b wins
+grep 'from pkg-b' platform/.compose/build/override.txt
+
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+  - name: pkg-b
+    source:
+      type: path
+      url: ../src/pkg-b
+
+-- src/pkg-a/plasma-compose.yaml --
+dependencies:
+  - name: lib-common
+    source:
+      type: path
+      url: ../src/lib-common
+
+-- src/pkg-b/plasma-compose.yaml --
+dependencies:
+  - name: lib-common
+    source:
+      type: path
+      url: ../src/lib-common
+
+-- src/lib-common/lib/common.txt --
+lib-common content
+
+-- src/lib-common/shared.txt --
+from lib-common
+
+-- src/lib-common/override.txt --
+from lib-common
+
+-- src/pkg-a/pkg-a.txt --
+pkg-a content
+
+-- src/pkg-a/shared.txt --
+from pkg-a
+
+-- src/pkg-a/override.txt --
+from pkg-a
+
+-- src/pkg-b/pkg-b.txt --
+pkg-b content
+
+-- src/pkg-b/shared.txt --
+from pkg-b
+
+-- src/pkg-b/override.txt --
+from pkg-b

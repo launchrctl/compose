@@ -1,0 +1,37 @@
+# remove-extra-local-files: platform files matching the listed paths are excluded from the build.
+# scripts/ is declared in the package strategy → platform scripts/ is not included in the build.
+#
+# Layout:
+#   $WORK/src/pkg-a/  — package source
+#   $WORK/platform/   — domain, compose runs here
+
+exec sh -c 'cd platform && launchr compose --interactive=false'
+stdout 'Creating composition'
+! stderr .
+
+# config/ is not in the strategy → platform file is included
+exists platform/.compose/build/config/app.yml
+
+# scripts/ is in the strategy → platform file is excluded
+! exists platform/.compose/build/scripts/deploy.sh
+
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+      strategy:
+        - name: remove-extra-local-files
+          path:
+            - scripts/
+
+-- src/pkg-a/README.md --
+pkg-a content
+
+-- platform/config/app.yml --
+app: platform config
+
+-- platform/scripts/deploy.sh --
+#!/bin/sh
+echo deploy

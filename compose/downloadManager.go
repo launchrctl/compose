@@ -2,9 +2,12 @@ package compose
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -12,6 +15,8 @@ const (
 	GitType = "git"
 	// HTTPType is const for http source type download.
 	HTTPType = "http"
+	// PathType is const for local filesystem source type.
+	PathType = "path"
 )
 
 // Downloader interface
@@ -38,6 +43,8 @@ func (m DownloadManager) getDownloaderForPackage(downloadType string) Downloader
 	switch downloadType {
 	case HTTPType:
 		return newHTTP(m.kw)
+	case PathType:
+		return newPath()
 	case GitType:
 		fallthrough
 	default:
@@ -45,19 +52,57 @@ func (m DownloadManager) getDownloaderForPackage(downloadType string) Downloader
 	}
 }
 
-// Download packages using compose file
-func (m DownloadManager) Download(ctx context.Context, c *YamlCompose, targetDir string) ([]*Package, error) {
+// resolvedPkg tracks a resolved package for conflict and cycle detection.
+type resolvedPkg struct {
+	pkgType    string
+	url        string
+	ref        string
+	requiredBy []string
+}
+
+// depStack tracks the current recursion path for cycle detection.
+// It maintains insertion order so error messages show the exact dependency chain.
+type depStack struct {
+	items []string
+	set   map[string]bool
+}
+
+func newDepStack() *depStack {
+	return &depStack{set: make(map[string]bool)}
+}
+
+func (s *depStack) push(name string) {
+	s.items = append(s.items, name)
+	s.set[name] = true
+}
+
+func (s *depStack) pop(name string) {
+	s.items = s.items[:len(s.items)-1]
+	delete(s.set, name)
+}
+
+func (s *depStack) has(name string) bool {
+	return s.set[name]
+}
+
+func (s *depStack) path() string {
+	return strings.Join(s.items, " → ")
+}
+
+// Download packages using compose file.
+// Returns packages in topological order and a map of package name → required_by list.
+func (m DownloadManager) Download(ctx context.Context, c *YamlCompose, targetDir string) ([]*Package, map[string][]string, error) {
 	var packages []*Package
-	//credentials := []keyring.CredentialsItem{}
 	err := EnsureDirExists(targetDir)
 	if err != nil {
-		return packages, err
+		return packages, nil, err
 	}
 
 	kw := m.getKeyring()
-	packages, err = m.recursiveDownload(ctx, c, packages, nil, targetDir)
+	seen := make(map[string]resolvedPkg)
+	packages, err = m.recursiveDownload(ctx, c, packages, nil, targetDir, seen, newDepStack())
 	if err != nil {
-		return packages, err
+		return packages, nil, err
 	}
 
 	// store keyring credentials
@@ -65,39 +110,74 @@ func (m DownloadManager) Download(ctx context.Context, c *YamlCompose, targetDir
 		err = kw.keyringService.Save()
 	}
 
-	return packages, err
+	requiredBy := make(map[string][]string, len(seen))
+	for name, rp := range seen {
+		requiredBy[name] = rp.requiredBy
+	}
+
+	return packages, requiredBy, err
 }
 
-func (m DownloadManager) recursiveDownload(ctx context.Context, yc *YamlCompose, packages []*Package, parent *Package, targetDir string) ([]*Package, error) {
+func (m DownloadManager) recursiveDownload(ctx context.Context, yc *YamlCompose, packages []*Package, parent *Package, targetDir string, seen map[string]resolvedPkg, stack *depStack) ([]*Package, error) {
 	for _, d := range yc.Dependencies {
 		select {
 		case <-ctx.Done():
 			return packages, ctx.Err()
 		default:
-			// build package from dependency struct
-			// add dependency if parent exists
 			pkg := d.ToPackage(d.Name)
+			name := pkg.GetName()
+			ref := pkg.GetTarget()
+
 			if parent != nil {
-				parent.AddDependency(d.Name)
+				parent.AddDependency(name)
 			}
 
-			url := pkg.GetURL()
-			if url == "" {
+			if pkg.GetURL() == "" {
 				return packages, errNoURL
 			}
 
-			packagePath := filepath.Join(targetDir, pkg.GetName(), pkg.GetTarget())
+			// Cycle detection: package is already being processed up the call stack.
+			// Must run before the seen dedup check, otherwise cycles with the same ref
+			// would be silently skipped instead of raising an error.
+			if stack.has(name) {
+				return packages, fmt.Errorf("circular dependency detected: %s → %s", stack.path(), name)
+			}
+
+			// Conflict detection: same package name required with different type, url, or ref.
+			if existing, ok := seen[name]; ok {
+				if existing.pkgType != pkg.GetType() || existing.url != pkg.GetURL() || existing.ref != ref {
+					return packages, fmt.Errorf(
+						"version conflict: package %q required as %s %s@%s by %q and as %s %s@%s by %q",
+						name,
+						existing.pkgType, existing.url, existing.ref, existing.requiredBy,
+						pkg.GetType(), pkg.GetURL(), ref, requiredBy(parent),
+					)
+				}
+				// Same source already resolved — accumulate the additional parent and skip.
+				existing.requiredBy = append(existing.requiredBy, requiredBy(parent))
+				seen[name] = existing
+				continue
+			}
+
+			seen[name] = resolvedPkg{pkgType: pkg.GetType(), url: pkg.GetURL(), ref: ref, requiredBy: []string{requiredBy(parent)}}
+
+			packagePath := filepath.Join(targetDir, name, ref)
 
 			err := m.downloadPackage(ctx, pkg, targetDir)
 			if err != nil {
 				return packages, err
 			}
 
-			// If package has plasma-compose.yaml, proceed with it
-			if _, err = os.Stat(filepath.Join(packagePath, composeFile)); !os.IsNotExist(err) {
+			// If package has plasma-compose.yaml, recurse into it.
+			if _, statErr := os.Stat(filepath.Join(packagePath, composeFile)); !os.IsNotExist(statErr) {
 				cfg, err := Lookup(os.DirFS(packagePath))
+				if err != nil && !errors.Is(err, errComposeNotExists) {
+					return packages, fmt.Errorf("package %q: %w", name, err)
+				}
 				if err == nil {
-					packages, err = m.recursiveDownload(ctx, cfg, packages, pkg, targetDir)
+					stack.push(name)
+					packages, err = m.recursiveDownload(ctx, cfg, packages, pkg, targetDir, seen, stack)
+					stack.pop(name)
 					if err != nil {
 						return packages, err
 					}
@@ -109,6 +189,14 @@ func (m DownloadManager) recursiveDownload(ctx context.Context, yc *YamlCompose,
 	}
 
 	return packages, nil
+}
+
+// requiredBy returns the name of the parent package, or "root" if declared in the root compose.
+func requiredBy(parent *Package) string {
+	if parent == nil {
+		return "root"
+	}
+	return parent.GetName()
 }
 
 func (m DownloadManager) downloadPackage(ctx context.Context, pkg *Package, targetDir string) error {

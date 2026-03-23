@@ -1,0 +1,34 @@
+# ignore-extra-package-files: files from the listed paths are skipped,
+# even if no other package provides them.
+#
+# Layout:
+#   $WORK/src/pkg-a/  — package source
+#   $WORK/platform/   — domain, compose runs here
+
+exec sh -c 'cd platform && launchr compose --interactive=false'
+stdout 'Creating composition'
+! stderr .
+
+# config/ is not in the ignore list — included
+exists platform/.compose/build/config/app.yml
+
+# scripts/ is in the ignore list — excluded
+! exists platform/.compose/build/scripts/run.sh
+
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+      strategy:
+        - name: ignore-extra-package-files
+          path:
+            - scripts/
+
+-- src/pkg-a/config/app.yml --
+app: config
+
+-- src/pkg-a/scripts/run.sh --
+#!/bin/sh
+echo run

@@ -1,0 +1,41 @@
+# filter-package-files + last-wins: pkg-b is declared later and overwrites pkg-a
+# for files within its whitelist.
+#
+# Layout:
+#   $WORK/src/pkg-a/  — package source
+#   $WORK/src/pkg-b/  — package source
+#   $WORK/platform/   — domain, compose runs here
+
+exec sh -c 'cd platform && launchr compose --interactive=false'
+stdout 'Creating composition'
+! stderr .
+
+# pkg-b is declared after pkg-a and has a filter on config/ → its version wins
+grep 'from pkg-b' platform/.compose/build/config/app.yml
+
+# pkg-b does not include scripts/ in its filter → scripts/ from pkg-a remains
+grep 'from pkg-a' platform/.compose/build/scripts/run.sh
+
+-- platform/plasma-compose.yaml --
+dependencies:
+  - name: pkg-a
+    source:
+      type: path
+      url: ../src/pkg-a
+  - name: pkg-b
+    source:
+      type: path
+      url: ../src/pkg-b
+      strategy:
+        - name: filter-package-files
+          path:
+            - config/
+
+-- src/pkg-a/config/app.yml --
+from pkg-a
+
+-- src/pkg-a/scripts/run.sh --
+from pkg-a
+
+-- src/pkg-b/config/app.yml --
+from pkg-b
